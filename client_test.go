@@ -34,13 +34,11 @@ func TestExecuteRequestSuccessAndPayload(t *testing.T) {
 	}))
 	defer server.Close()
 
-	host, port := serverHostPort(t, server.URL)
 	temperature := 0.25
 	topP := 0.95
 	maxTokens := 256
 	cfg := config{
-		Endpoint:        host,
-		Port:            port,
+		BaseURL:         server.URL,
 		Model:           "gpt-4o-mini",
 		APIKey:          "test-key",
 		Temperature:     &temperature,
@@ -94,10 +92,8 @@ func TestExecuteRequestErrorResponse(t *testing.T) {
 	}))
 	defer server.Close()
 
-	host, port := serverHostPort(t, server.URL)
 	_, err := executeRequest(config{
-		Endpoint: host,
-		Port:     port,
+		BaseURL:  server.URL,
 		Model:    "m",
 		APIKey:   "k",
 		Messages: []chatMessage{{Role: "user", Content: "x"}},
@@ -108,10 +104,9 @@ func TestExecuteRequestErrorResponse(t *testing.T) {
 }
 
 func TestExecuteRequestAdditionalErrorPaths(t *testing.T) {
-	host, port := serverWithRawResponse(t, http.StatusOK, "application/json", `{"choices":[]}`)
+	baseURL := serverWithRawResponse(t, http.StatusOK, "application/json", `{"choices":[]}`)
 	_, err := executeRequest(config{
-		Endpoint: host,
-		Port:     port,
+		BaseURL:  baseURL,
 		Model:    "m",
 		Messages: []chatMessage{{Role: "user", Content: "x"}},
 	})
@@ -119,10 +114,9 @@ func TestExecuteRequestAdditionalErrorPaths(t *testing.T) {
 		t.Fatalf("expected no choices error, got %v", err)
 	}
 
-	host, port = serverWithRawResponse(t, http.StatusOK, "application/json", `{"choices":[{"message":{"role":"assistant","content":"   "}}]}`)
+	baseURL = serverWithRawResponse(t, http.StatusOK, "application/json", `{"choices":[{"message":{"role":"assistant","content":"   "}}]}`)
 	_, err = executeRequest(config{
-		Endpoint: host,
-		Port:     port,
+		BaseURL:  baseURL,
 		Model:    "m",
 		Messages: []chatMessage{{Role: "user", Content: "x"}},
 	})
@@ -130,17 +124,15 @@ func TestExecuteRequestAdditionalErrorPaths(t *testing.T) {
 		t.Fatalf("expected empty assistant content error, got %v", err)
 	}
 
-	host, port = serverWithRawResponse(t, http.StatusOK, "application/json", `not-json`)
+	baseURL = serverWithRawResponse(t, http.StatusOK, "application/json", `not-json`)
 	_, err = executeRequest(config{
-		Endpoint: host,
-		Port:     port,
+		BaseURL:  baseURL,
 		Model:    "m",
 		Messages: []chatMessage{{Role: "user", Content: "x"}},
 	})
 	if err == nil || !strings.Contains(err.Error(), "unable to parse API response") {
 		t.Fatalf("expected parse error, got %v", err)
 	}
-
 }
 
 func TestExecuteRequestWithoutAPIKeyOmitsAuthHeader(t *testing.T) {
@@ -152,10 +144,8 @@ func TestExecuteRequestWithoutAPIKeyOmitsAuthHeader(t *testing.T) {
 	}))
 	defer server.Close()
 
-	host, port := serverHostPort(t, server.URL)
 	content, err := executeRequest(config{
-		Endpoint: host,
-		Port:     port,
+		BaseURL:  server.URL,
 		Model:    "m",
 		APIKey:   "",
 		Messages: []chatMessage{{Role: "user", Content: "x"}},
@@ -181,11 +171,9 @@ func TestExecuteStreamingRequestWithoutAPIKey(t *testing.T) {
 	}))
 	defer server.Close()
 
-	host, port := serverHostPort(t, server.URL)
 	var out strings.Builder
 	err := executeStreamingRequest(config{
-		Endpoint: host,
-		Port:     port,
+		BaseURL:  server.URL,
 		Model:    "gpt-4o-mini",
 		APIKey:   "",
 		Messages: []chatMessage{{Role: "user", Content: "hello"}},
@@ -202,11 +190,10 @@ func TestExecuteStreamingRequestWithoutAPIKey(t *testing.T) {
 }
 
 func TestExecuteStreamingRequestAdditionalPaths(t *testing.T) {
-	host, port := serverWithRawResponse(t, http.StatusOK, "application/json", `{"choices":[{"message":{"role":"assistant","content":"ok"}}]}`)
+	baseURL := serverWithRawResponse(t, http.StatusOK, "application/json", `{"choices":[{"message":{"role":"assistant","content":"ok"}}]}`)
 	var out strings.Builder
 	err := executeStreamingRequest(config{
-		Endpoint: host,
-		Port:     port,
+		BaseURL:  baseURL,
 		Model:    "m",
 		Format:   "text",
 		Messages: []chatMessage{{Role: "user", Content: "x"}},
@@ -218,10 +205,9 @@ func TestExecuteStreamingRequestAdditionalPaths(t *testing.T) {
 		t.Fatalf("expected fallback output with newline, got %q", out.String())
 	}
 
-	host, port = serverWithRawResponse(t, http.StatusOK, "application/json", `not-json`)
+	baseURL = serverWithRawResponse(t, http.StatusOK, "application/json", `not-json`)
 	err = executeStreamingRequest(config{
-		Endpoint: host,
-		Port:     port,
+		BaseURL:  baseURL,
 		Model:    "m",
 		Messages: []chatMessage{{Role: "user", Content: "x"}},
 	}, &strings.Builder{})
@@ -229,10 +215,9 @@ func TestExecuteStreamingRequestAdditionalPaths(t *testing.T) {
 		t.Fatalf("expected non-sse parse error, got %v", err)
 	}
 
-	host, port = serverWithRawResponse(t, http.StatusBadRequest, "text/plain", `plain error`)
+	baseURL = serverWithRawResponse(t, http.StatusBadRequest, "text/plain", `plain error`)
 	err = executeStreamingRequest(config{
-		Endpoint: host,
-		Port:     port,
+		BaseURL:  baseURL,
 		Model:    "m",
 		Messages: []chatMessage{{Role: "user", Content: "x"}},
 	}, &strings.Builder{})
@@ -240,10 +225,9 @@ func TestExecuteStreamingRequestAdditionalPaths(t *testing.T) {
 		t.Fatalf("expected status/body error, got %v", err)
 	}
 
-	host, port = serverWithRawResponse(t, http.StatusOK, "application/json", `{"choices":[]}`)
+	baseURL = serverWithRawResponse(t, http.StatusOK, "application/json", `{"choices":[]}`)
 	err = executeStreamingRequest(config{
-		Endpoint: host,
-		Port:     port,
+		BaseURL:  baseURL,
 		Model:    "m",
 		Messages: []chatMessage{{Role: "user", Content: "x"}},
 	}, &strings.Builder{})
@@ -251,10 +235,9 @@ func TestExecuteStreamingRequestAdditionalPaths(t *testing.T) {
 		t.Fatalf("expected no choices error, got %v", err)
 	}
 
-	host, port = serverWithRawResponse(t, http.StatusOK, "application/json", `{"choices":[{"message":{"role":"assistant","content":"   "}}]}`)
+	baseURL = serverWithRawResponse(t, http.StatusOK, "application/json", `{"choices":[{"message":{"role":"assistant","content":"   "}}]}`)
 	err = executeStreamingRequest(config{
-		Endpoint: host,
-		Port:     port,
+		BaseURL:  baseURL,
 		Model:    "m",
 		Messages: []chatMessage{{Role: "user", Content: "x"}},
 	}, &strings.Builder{})
@@ -262,10 +245,9 @@ func TestExecuteStreamingRequestAdditionalPaths(t *testing.T) {
 		t.Fatalf("expected empty content error, got %v", err)
 	}
 
-	host, port = serverWithRawResponse(t, http.StatusOK, "application/json", `{"choices":[{"message":{"role":"assistant","content":"ok"}}]}`)
+	baseURL = serverWithRawResponse(t, http.StatusOK, "application/json", `{"choices":[{"message":{"role":"assistant","content":"ok"}}]}`)
 	err = executeStreamingRequest(config{
-		Endpoint: host,
-		Port:     port,
+		BaseURL:  baseURL,
 		Model:    "m",
 		Messages: []chatMessage{{Role: "user", Content: "x"}},
 	}, &failingWriter{})
@@ -276,12 +258,11 @@ func TestExecuteStreamingRequestAdditionalPaths(t *testing.T) {
 
 func TestExecuteStreamingRequestBuildURLFailure(t *testing.T) {
 	err := executeStreamingRequest(config{
-		Endpoint: "",
-		Port:     1234,
+		BaseURL:  "",
 		Model:    "m",
 		Messages: []chatMessage{{Role: "user", Content: "x"}},
 	}, &strings.Builder{})
-	if err == nil || !strings.Contains(err.Error(), "endpoint cannot be empty") {
-		t.Fatalf("expected endpoint validation error, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "base URL cannot be empty") {
+		t.Fatalf("expected base URL validation error, got %v", err)
 	}
 }

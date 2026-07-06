@@ -12,7 +12,7 @@ import (
 )
 
 func executeRequest(cfg config) (string, error) {
-	requestURL, err := buildRequestURL(cfg.Endpoint, cfg.Port)
+	requestURL, err := buildRequestURL(cfg.BaseURL)
 	if err != nil {
 		return "", err
 	}
@@ -77,7 +77,7 @@ func executeRequest(cfg config) (string, error) {
 }
 
 func executeStreamingRequest(cfg config, output io.Writer) error {
-	requestURL, err := buildRequestURL(cfg.Endpoint, cfg.Port)
+	requestURL, err := buildRequestURL(cfg.BaseURL)
 	if err != nil {
 		return err
 	}

@@ -1,10 +1,10 @@
 # spit
 
-`spit` is a small Go CLI that sends chat-completion requests to an OpenAI-compatible endpoint and prints the assistant output.
+`spit` is a small Go CLI that sends chat-completion requests to an OpenAI-compatible base URL and prints the assistant output.
 
 ## Features
 
-- Endpoint host and port from CLI flags or environment variables
+- Base URL from CLI flags or environment variables
 - Any number of `system` and `user` prompts via args, preserved in payload order
 - Optional stdin input appended as the final `user` message
 - Streams assistant output as it is received
@@ -16,8 +16,7 @@ Flags override environment variables.
 
 | Flag | Env var | Required | Default |
 | --- | --- | --- | --- |
-| `--endpoint` / `-e` | `OPENAI_ENDPOINT` | Yes | none |
-| `--port` | `OPENAI_PORT` | No | inferred from endpoint (`443` for `https`, else `80`) |
+| `--base-url` / `-u` | `OPENAI_BASE_URL` | Yes | none |
 | `--api-key` | `OPENAI_API_KEY` | No | unset |
 | `--model` / `-m` | `OPENAI_MODEL` | No | `gpt-4o-mini` |
 | `--format` / `-f` | n/a | No | `text` (`text` or `json`) |
@@ -32,7 +31,7 @@ Message args:
 - `--prompt "<text>"` or `-p "<text>"` (repeatable)
 - positional args are combined into one `user` message
 - stdin, when present, is appended as the last `user` message
-- endpoint can include a path; if omitted, `/v1/chat/completions` is used
+- base URL path is used as provided, and requests append `/chat/completions` (for OpenAI-compatible APIs, pass a base URL ending in `/v1`)
 
 ## Build
 
@@ -68,8 +67,7 @@ Run the built binary with explicit flags:
 
 ```bash
 ./spit \
-  -e localhost \
-  --port 1234 \
+  -u http://localhost:1234 \
   --api-key test-key \
   -m gpt-4o-mini \
   -f json \
@@ -85,7 +83,7 @@ Multiple ordered messages in one payload:
 
 ```bash
 ./spit \
-  --endpoint http://127.0.0.1 \
+  --base-url http://127.0.0.1 \
   --api-key test-key \
   --system "You are a coding assistant." \
   --prompt "First question" \
@@ -97,8 +95,7 @@ Append stdin as the last user message:
 
 ```bash
 echo "extra context from stdin" | ./spit \
-  --endpoint localhost \
-  --port 1234 \
+  --base-url http://localhost:1234 \
   --api-key test-key \
   --prompt "Use the following context:"
 ```
@@ -106,8 +103,7 @@ echo "extra context from stdin" | ./spit \
 Use environment variables:
 
 ```bash
-export OPENAI_ENDPOINT=localhost
-export OPENAI_PORT=1234
+export OPENAI_BASE_URL=http://localhost:1234
 export OPENAI_API_KEY=test-key
 ./spit --prompt "Hello"
 ```

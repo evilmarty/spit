@@ -31,7 +31,7 @@ func TestRunParsesNewFlagsAndPreservesMessageOrder(t *testing.T) {
 	stdout, err := captureStdout(t, func() error {
 		return withStdin(t, "stdin message\n", func() error {
 			return run([]string{
-				"-e", server.URL,
+				"-u", server.URL,
 				"--api-key", "key",
 				"-m", "model-short",
 				"-f", "json",
@@ -90,7 +90,7 @@ func TestRunParsesNewFlagsAndPreservesMessageOrder(t *testing.T) {
 func TestRunRequiresUserMessage(t *testing.T) {
 	err := withStdin(t, "", func() error {
 		return run([]string{
-			"--endpoint", "http://example.com:1234",
+			"--base-url", "http://example.com:1234",
 			"--api-key", "key",
 			"-s", "system only",
 		})
@@ -127,7 +127,7 @@ func TestRunCombinesPositionalArgsIntoSingleMessage(t *testing.T) {
 
 	_, err := captureStdout(t, func() error {
 		return run([]string{
-			"-e", server.URL,
+			"-u", server.URL,
 			"--api-key", "key",
 			"positional",
 			"user",
@@ -155,8 +155,8 @@ func TestHelpListsArguments(t *testing.T) {
 	}
 
 	expected := []string{
-		"-endpoint",
-		"-e",
+		"-base-url",
+		"-u",
 		"-api-key",
 		"-model",
 		"-m",

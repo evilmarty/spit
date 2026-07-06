@@ -33,8 +33,7 @@ type apiErrorResponse struct {
 }
 
 type config struct {
-	Endpoint        string
-	Port            int
+	BaseURL         string
 	Model           string
 	APIKey          string
 	Format          string

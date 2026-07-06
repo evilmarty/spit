@@ -2,11 +2,11 @@
 
 ## Application overview
 
-`spit` is a Go CLI that sends prompts to an OpenAI-compatible Chat Completions endpoint and streams output to stdout as it is received.
+`spit` is a Go CLI that sends prompts to an OpenAI-compatible Chat Completions base URL and streams output to stdout as it is received.
 
 Core behavior:
 
-- Accepts endpoint configuration (`--endpoint`/`-e`, optional `--port`)
+- Accepts base URL configuration (`--base-url`/`-u`)
 - Accepts ordered message inputs from `--system`/`-s`, `--prompt`/`-p`, positional args, and optional stdin
 - Sends one chat-completions request with `stream: true`
 - Supports optional generation controls (`--model`, `--format`, `--temperature`, `--top-p`, `--max_tokens`, `--reasoning-effort`)

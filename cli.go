@@ -11,9 +11,8 @@ import (
 
 func run(args []string) error {
 	var (
-		endpointArg        string
-		endpointShortArg   string
-		portArg            int
+		baseURLArg         string
+		baseURLShortArg    string
 		modelArg           string
 		apiKeyArg          string
 		formatArg          string
@@ -26,9 +25,8 @@ func run(args []string) error {
 	collector := &messageCollector{}
 	flags := flag.NewFlagSet("spit", flag.ContinueOnError)
 	flags.SetOutput(os.Stderr)
-	flags.StringVar(&endpointArg, "endpoint", "", "endpoint host or URL (env: OPENAI_ENDPOINT)")
-	flags.StringVar(&endpointShortArg, "e", "", "endpoint host or URL (shorthand)")
-	flags.IntVar(&portArg, "port", -1, "endpoint port (env: OPENAI_PORT)")
+	flags.StringVar(&baseURLArg, "base-url", "", "base URL (env: OPENAI_BASE_URL)")
+	flags.StringVar(&baseURLShortArg, "u", "", "base URL (shorthand)")
 	flags.StringVar(&modelArg, "model", "", "model name (env: OPENAI_MODEL, default: gpt-4o-mini)")
 	flags.StringVar(&modelArg, "m", "", "model name (shorthand)")
 	flags.StringVar(&apiKeyArg, "api-key", "", "API key (env: OPENAI_API_KEY)")
@@ -51,10 +49,9 @@ func run(args []string) error {
 		return collector.add("user", value)
 	})
 	flags.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage: %s --endpoint <host|url> [options]\n\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s --base-url <url> [options]\n\n", os.Args[0])
 		fmt.Fprintln(os.Stderr, "Options:")
-		fmt.Fprintln(os.Stderr, "  --endpoint, -e <host|url>         Endpoint host or URL (env: OPENAI_ENDPOINT)")
-		fmt.Fprintln(os.Stderr, "  --port <int>                      Endpoint port override (env: OPENAI_PORT)")
+		fmt.Fprintln(os.Stderr, "  --base-url, -u <url>              Base URL (env: OPENAI_BASE_URL)")
 		fmt.Fprintln(os.Stderr, "  --api-key <key>                   API key (optional, env: OPENAI_API_KEY)")
 		fmt.Fprintln(os.Stderr, "  --model, -m <name>                Model name (env: OPENAI_MODEL, default: gpt-4o-mini)")
 		fmt.Fprintln(os.Stderr, "  --format, -f <text|json>          Response format mode (default: text)")
@@ -99,7 +96,7 @@ func run(args []string) error {
 		return errors.New("at least one user prompt is required")
 	}
 
-	cfg, err := resolveConfig(endpointArg, endpointShortArg, portArg, modelArg, apiKeyArg, formatArg, temperatureArg, topPArg, maxTokensArg, reasoningEffortArg)
+	cfg, err := resolveConfig(baseURLArg, baseURLShortArg, modelArg, apiKeyArg, formatArg, temperatureArg, topPArg, maxTokensArg, reasoningEffortArg)
 	if err != nil {
 		return err
 	}

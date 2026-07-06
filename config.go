@@ -3,20 +3,19 @@ package main
 import (
 	"errors"
 	"fmt"
-	"net"
 	"net/url"
 	"os"
 	"strconv"
 	"strings"
 )
 
-func resolveConfig(endpointArg, endpointShortArg string, portArg int, modelArg, apiKeyArg, formatArg, temperatureArg, topPArg string, maxTokensArg int, reasoningEffortArg string) (config, error) {
-	endpoint := resolveString(endpointArg, "", "")
-	if endpoint == "" {
-		endpoint = resolveString(endpointShortArg, "OPENAI_ENDPOINT", "")
+func resolveConfig(baseURLArg, baseURLShortArg, modelArg, apiKeyArg, formatArg, temperatureArg, topPArg string, maxTokensArg int, reasoningEffortArg string) (config, error) {
+	baseURL := resolveString(baseURLArg, "", "")
+	if baseURL == "" {
+		baseURL = resolveString(baseURLShortArg, "OPENAI_BASE_URL", "")
 	}
-	if endpoint == "" {
-		return config{}, errors.New("missing endpoint; set --endpoint/-e or OPENAI_ENDPOINT")
+	if baseURL == "" {
+		return config{}, errors.New("missing base URL; set --base-url/-u or OPENAI_BASE_URL")
 	}
 
 	apiKey := resolveString(apiKeyArg, "OPENAI_API_KEY", "")
@@ -40,14 +39,8 @@ func resolveConfig(endpointArg, endpointShortArg string, portArg int, modelArg, 
 	}
 	reasoningEffort := resolveString(reasoningEffortArg, "OPENAI_REASONING_EFFORT", "")
 
-	port, err := resolvePort(portArg, endpoint)
-	if err != nil {
-		return config{}, err
-	}
-
 	return config{
-		Endpoint:        endpoint,
-		Port:            port,
+		BaseURL:         baseURL,
 		Model:           model,
 		APIKey:          apiKey,
 		Format:          format,
@@ -91,47 +84,6 @@ func resolveString(argValue, envKey, fallback string) string {
 	return fallback
 }
 
-func resolvePort(portArg int, endpoint string) (int, error) {
-	if portArg > 0 {
-		return portArg, nil
-	}
-	if portArg == 0 {
-		return 0, errors.New("invalid port 0")
-	}
-
-	if envPort := strings.TrimSpace(os.Getenv("OPENAI_PORT")); envPort != "" {
-		parsed, err := strconv.Atoi(envPort)
-		if err != nil || parsed <= 0 {
-			return 0, fmt.Errorf("invalid OPENAI_PORT value %q", envPort)
-		}
-		return parsed, nil
-	}
-
-	normalized := endpoint
-	if !strings.Contains(normalized, "://") {
-		normalized = "http://" + normalized
-	}
-
-	parsedEndpoint, err := url.Parse(normalized)
-	if err != nil {
-		return 0, fmt.Errorf("invalid endpoint %q: %w", endpoint, err)
-	}
-
-	if endpointPort := parsedEndpoint.Port(); endpointPort != "" {
-		parsed, err := strconv.Atoi(endpointPort)
-		if err != nil || parsed <= 0 {
-			return 0, fmt.Errorf("invalid endpoint port %q", endpointPort)
-		}
-		return parsed, nil
-	}
-
-	if parsedEndpoint.Scheme == "https" {
-		return 443, nil
-	}
-
-	return 80, nil
-}
-
 func resolveOptionalFloat(argValue, envKey string) (*float64, error) {
 	value := resolveString(argValue, envKey, "")
 	if value == "" {
@@ -172,10 +124,10 @@ func envKeyOrFlag(envKey string) string {
 	return envKey
 }
 
-func buildRequestURL(endpoint string, port int) (string, error) {
-	normalized := strings.TrimSpace(endpoint)
+func buildRequestURL(baseURL string) (string, error) {
+	normalized := strings.TrimSpace(baseURL)
 	if normalized == "" {
-		return "", errors.New("endpoint cannot be empty")
+		return "", errors.New("base URL cannot be empty")
 	}
 
 	if !strings.Contains(normalized, "://") {
@@ -184,22 +136,19 @@ func buildRequestURL(endpoint string, port int) (string, error) {
 
 	parsedEndpoint, err := url.Parse(normalized)
 	if err != nil {
-		return "", fmt.Errorf("invalid endpoint %q: %w", endpoint, err)
+		return "", fmt.Errorf("invalid base URL %q: %w", baseURL, err)
 	}
 
 	hostname := parsedEndpoint.Hostname()
 	if hostname == "" {
-		return "", fmt.Errorf("endpoint %q does not contain a valid host", endpoint)
+		return "", fmt.Errorf("base URL %q does not contain a valid host", baseURL)
 	}
 
-	if port <= 0 {
-		return "", fmt.Errorf("invalid port %d", port)
-	}
-
-	parsedEndpoint.Host = net.JoinHostPort(hostname, strconv.Itoa(port))
-
-	if parsedEndpoint.Path == "" || parsedEndpoint.Path == "/" {
-		parsedEndpoint.Path = "/v1/chat/completions"
+	basePath := strings.TrimSuffix(parsedEndpoint.Path, "/")
+	if basePath == "" {
+		parsedEndpoint.Path = "/chat/completions"
+	} else {
+		parsedEndpoint.Path = basePath + "/chat/completions"
 	}
 
 	parsedEndpoint.RawQuery = ""

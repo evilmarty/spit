@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"strconv"
-	"strings"
 	"testing"
 )
 
@@ -23,7 +21,7 @@ func (f *failingReader) Read(_ []byte) (int, error) {
 	return 0, errors.New("forced read failure")
 }
 
-func serverWithRawResponse(t *testing.T, status int, contentType, body string) (string, int) {
+func serverWithRawResponse(t *testing.T, status int, contentType, body string) string {
 	t.Helper()
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -33,7 +31,7 @@ func serverWithRawResponse(t *testing.T, status int, contentType, body string) (
 	}))
 	t.Cleanup(server.Close)
 
-	return serverHostPort(t, server.URL)
+	return server.URL
 }
 
 func withEnv(t *testing.T, values map[string]string, fn func()) {
@@ -145,21 +143,4 @@ func captureStderr(t *testing.T, fn func() error) (string, error) {
 	_ = readPipe.Close()
 
 	return string(out), callErr
-}
-
-func serverHostPort(t *testing.T, rawURL string) (string, int) {
-	t.Helper()
-
-	trimmed := strings.TrimPrefix(rawURL, "http://")
-	trimmed = strings.TrimPrefix(trimmed, "https://")
-	parts := strings.Split(trimmed, ":")
-	if len(parts) != 2 {
-		t.Fatalf("unexpected test server URL %q", rawURL)
-	}
-
-	port, err := strconv.Atoi(parts[1])
-	if err != nil {
-		t.Fatalf("invalid test server port in %q: %v", rawURL, err)
-	}
-	return parts[0], port
 }
