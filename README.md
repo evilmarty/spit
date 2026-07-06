@@ -9,6 +9,7 @@
 - Optional stdin input appended as the final `user` message
 - Streams assistant output as it is received
 - One API request per invocation
+- On interrupt (`Ctrl+C`/`SIGTERM`), cancels in-flight work, keeps partial output, appends newline, and exits with code `130`
 
 ## Configuration
 

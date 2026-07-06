@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,7 +12,13 @@ import (
 	"time"
 )
 
+var errInterrupted = errors.New("interrupted by signal")
+
 func executeRequest(cfg config) (string, error) {
+	return executeRequestWithContext(context.Background(), cfg)
+}
+
+func executeRequestWithContext(ctx context.Context, cfg config) (string, error) {
 	requestURL, err := buildRequestURL(cfg.BaseURL)
 	if err != nil {
 		return "", err
@@ -33,7 +40,7 @@ func executeRequest(cfg config) (string, error) {
 		return "", fmt.Errorf("unable to encode request payload: %w", err)
 	}
 
-	request, err := http.NewRequest(http.MethodPost, requestURL, bytes.NewReader(body))
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, requestURL, bytes.NewReader(body))
 	if err != nil {
 		return "", fmt.Errorf("unable to construct request: %w", err)
 	}
@@ -50,6 +57,9 @@ func executeRequest(cfg config) (string, error) {
 	client := &http.Client{Timeout: timeout}
 	response, err := client.Do(request)
 	if err != nil {
+		if errors.Is(err, context.Canceled) && isInterruptedContext(ctx) {
+			return "", errInterrupted
+		}
 		return "", fmt.Errorf("request failed: %w", err)
 	}
 	defer response.Body.Close()
@@ -81,6 +91,10 @@ func executeRequest(cfg config) (string, error) {
 }
 
 func executeStreamingRequest(cfg config, output io.Writer) error {
+	return executeStreamingRequestWithContext(context.Background(), cfg, output)
+}
+
+func executeStreamingRequestWithContext(ctx context.Context, cfg config, output io.Writer) error {
 	requestURL, err := buildRequestURL(cfg.BaseURL)
 	if err != nil {
 		return err
@@ -103,7 +117,7 @@ func executeStreamingRequest(cfg config, output io.Writer) error {
 		return fmt.Errorf("unable to encode request payload: %w", err)
 	}
 
-	request, err := http.NewRequest(http.MethodPost, requestURL, bytes.NewReader(body))
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, requestURL, bytes.NewReader(body))
 	if err != nil {
 		return fmt.Errorf("unable to construct request: %w", err)
 	}
@@ -116,6 +130,9 @@ func executeStreamingRequest(cfg config, output io.Writer) error {
 	client := newStreamingHTTPClient(cfg.RequestTimeout)
 	response, err := client.Do(request)
 	if err != nil {
+		if errors.Is(err, context.Canceled) && isInterruptedContext(ctx) {
+			return errInterrupted
+		}
 		return fmt.Errorf("request failed: %w", err)
 	}
 	defer response.Body.Close()
@@ -131,6 +148,10 @@ func executeStreamingRequest(cfg config, output io.Writer) error {
 	if !strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream") {
 		responseBody, err := io.ReadAll(response.Body)
 		if err != nil {
+			if errors.Is(err, context.Canceled) && isInterruptedContext(ctx) {
+				_ = trackedOutput.ensureTrailingNewline()
+				return errInterrupted
+			}
 			return fmt.Errorf("unable to read API response: %w", err)
 		}
 
@@ -157,9 +178,17 @@ func executeStreamingRequest(cfg config, output io.Writer) error {
 		idleTimeout = *cfg.IdleTimeout
 	}
 	if err := writeStreamingContentWithIdleTimeout(response.Body, trackedOutput, idleTimeout); err != nil {
+		if isInterruptedContext(ctx) {
+			_ = trackedOutput.ensureTrailingNewline()
+			return errInterrupted
+		}
 		return err
 	}
 	return trackedOutput.ensureTrailingNewline()
+}
+
+func isInterruptedContext(ctx context.Context) bool {
+	return ctx != nil && errors.Is(ctx.Err(), context.Canceled)
 }
 
 func newStreamingHTTPClient(requestTimeout *time.Duration) *http.Client {

@@ -1,7 +1,10 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
+	"flag"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -9,6 +12,7 @@ import (
 	"os/exec"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestRunParsesNewFlagsAndPreservesMessageOrder(t *testing.T) {
@@ -133,6 +137,45 @@ func TestRunRequiresBaseURLWhenEnvUnset(t *testing.T) {
 			t.Fatalf("expected missing base URL error, got %v", err)
 		}
 	})
+}
+
+func TestRunWithContextInterruptKeepsPartialOutputAndNewline(t *testing.T) {
+	started := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			t.Fatal("response writer does not implement http.Flusher")
+		}
+
+		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"partial\"}}]}\n\n"))
+		flusher.Flush()
+		close(started)
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		<-started
+		time.Sleep(10 * time.Millisecond)
+		cancel()
+	}()
+
+	out, err := captureStdout(t, func() error {
+		return runWithContext(ctx, []string{
+			"--base-url", server.URL,
+			"--model", "m",
+			"--prompt", "hello",
+		})
+	})
+	if !errors.Is(err, errInterrupted) {
+		t.Fatalf("expected interrupt error, got %v", err)
+	}
+	if out != "partial\n" {
+		t.Fatalf("expected partial output with newline, got %q", out)
+	}
 }
 
 func TestRunCombinesPositionalArgsIntoSingleMessage(t *testing.T) {
@@ -269,5 +312,20 @@ func TestMainHelpExitZero(t *testing.T) {
 	cmd.Env = append(os.Environ(), "SPIT_TEST_MAIN_HELP=1")
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("expected main help path to exit 0, got error: %v", err)
+	}
+}
+
+func TestExitCodeForError(t *testing.T) {
+	if code := exitCodeForError(nil); code != 0 {
+		t.Fatalf("expected exit code 0 for nil error, got %d", code)
+	}
+	if code := exitCodeForError(flag.ErrHelp); code != 0 {
+		t.Fatalf("expected exit code 0 for help, got %d", code)
+	}
+	if code := exitCodeForError(errInterrupted); code != 130 {
+		t.Fatalf("expected exit code 130 for interrupt, got %d", code)
+	}
+	if code := exitCodeForError(errors.New("x")); code != 1 {
+		t.Fatalf("expected exit code 1 for generic errors, got %d", code)
 	}
 }

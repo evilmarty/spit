@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -10,6 +11,10 @@ import (
 )
 
 func run(args []string) error {
+	return runWithContext(context.Background(), args)
+}
+
+func runWithContext(ctx context.Context, args []string) error {
 	var (
 		baseURLArg         string
 		baseURLShortArg    string
@@ -114,7 +119,7 @@ func run(args []string) error {
 	}
 	cfg.Messages = collector.messages
 
-	return executeStreamingRequest(cfg, os.Stdout)
+	return executeStreamingRequestWithContext(ctx, cfg, os.Stdout)
 }
 
 func (c *messageCollector) add(role, content string) error {

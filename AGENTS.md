@@ -12,6 +12,7 @@ Core behavior:
 - Sends one chat-completions request with `stream: true`
 - Supports optional generation/lifecycle controls (`--format`, `--temperature`, `--top-p`, `--max_tokens`, `--request-timeout`, `--idle-timeout`, `--reasoning-effort`)
 - Appends a trailing newline after stream completion (without duplicating an existing newline)
+- Treats `SIGINT`/`SIGTERM` as graceful interruption: preserve partial output, ensure trailing newline, and exit with code `130`
 
 ## Testing requirements
 

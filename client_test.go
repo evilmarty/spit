@@ -1,7 +1,9 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -321,5 +323,24 @@ func TestExecuteStreamingRequestIdleTimeout(t *testing.T) {
 	}
 	if !strings.Contains(out.String(), "first") {
 		t.Fatalf("expected partial streamed output before timeout, got %q", out.String())
+	}
+}
+
+func TestExecuteRequestWithContextInterrupt(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-r.Context().Done()
+	}))
+	defer server.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	_, err := executeRequestWithContext(ctx, config{
+		BaseURL:  server.URL,
+		Model:    "m",
+		Messages: []chatMessage{{Role: "user", Content: "x"}},
+	})
+	if !errors.Is(err, errInterrupted) {
+		t.Fatalf("expected interrupt error, got %v", err)
 	}
 }
