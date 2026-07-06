@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/banner.png" alt="spit" width="100%" />
+</p>
+
 # spit
 
 `spit` is a small Go CLI that sends chat-completion requests to an OpenAI-compatible base URL and prints the assistant output.
