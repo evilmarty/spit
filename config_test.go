@@ -65,6 +65,7 @@ func TestResolveConfigPrecedenceAndOptions(t *testing.T) {
 func TestResolveConfigUsesShortBaseURLBeforeEnv(t *testing.T) {
 	withEnv(t, map[string]string{
 		"OPENAI_BASE_URL": "http://env.example:8123",
+		"OPENAI_MODEL":    "env-model",
 		"OPENAI_API_KEY":  "",
 	}, func() {
 		cfg, err := resolveConfig("", "http://short.example:7000", "", "", "", "", "", -1, "", "", "")
@@ -85,12 +86,22 @@ func TestResolveConfigDefaults(t *testing.T) {
 		"OPENAI_BASE_URL": "",
 		"OPENAI_MODEL":    "",
 	}, func() {
+		_, err := resolveConfig("http://example.com", "", "", "", "", "", "", -1, "", "", "")
+		if err == nil || !strings.Contains(err.Error(), "missing model") {
+			t.Fatalf("expected missing model error, got %v", err)
+		}
+	})
+
+	withEnv(t, map[string]string{
+		"OPENAI_BASE_URL": "",
+		"OPENAI_MODEL":    "from-env",
+	}, func() {
 		cfg, err := resolveConfig("http://example.com", "", "", "", "", "", "", -1, "", "", "")
 		if err != nil {
 			t.Fatalf("resolveConfig returned error: %v", err)
 		}
-		if cfg.Model != "gpt-4o-mini" {
-			t.Fatalf("expected default model, got %q", cfg.Model)
+		if cfg.Model != "from-env" {
+			t.Fatalf("expected model from OPENAI_MODEL, got %q", cfg.Model)
 		}
 		if cfg.Format != "text" {
 			t.Fatalf("expected default format text, got %q", cfg.Format)
@@ -118,6 +129,7 @@ func TestResolveConfigErrors(t *testing.T) {
 	withEnv(t, map[string]string{
 		"OPENAI_BASE_URL": "http://example.com",
 		"OPENAI_API_KEY":  "key",
+		"OPENAI_MODEL":    "model",
 	}, func() {
 		_, err := resolveConfig("", "", "", "", "", "x", "", -1, "", "", "")
 		if err == nil || !strings.Contains(err.Error(), "OPENAI_TEMPERATURE") {
@@ -127,6 +139,7 @@ func TestResolveConfigErrors(t *testing.T) {
 
 	withEnv(t, map[string]string{
 		"OPENAI_BASE_URL": "http://example.com",
+		"OPENAI_MODEL":    "model",
 	}, func() {
 		_, err := resolveConfig("", "", "", "", "xml", "", "", -1, "", "", "")
 		if err == nil || !strings.Contains(err.Error(), "supported values are text or json") {
@@ -136,6 +149,7 @@ func TestResolveConfigErrors(t *testing.T) {
 
 	withEnv(t, map[string]string{
 		"OPENAI_BASE_URL":         "http://example.com",
+		"OPENAI_MODEL":            "model",
 		"OPENAI_REQUEST_TIMEOUT":  "nope",
 		"OPENAI_IDLE_TIMEOUT":     "",
 		"OPENAI_TEMPERATURE":      "",

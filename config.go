@@ -28,7 +28,10 @@ func resolveConfig(
 
 	apiKey := resolveString(apiKeyArg, "OPENAI_API_KEY", "")
 
-	model := resolveString(modelArg, "OPENAI_MODEL", "gpt-4o-mini")
+	model := resolveString(modelArg, "OPENAI_MODEL", "")
+	if model == "" {
+		return config{}, errors.New("missing model; set --model/-m or OPENAI_MODEL")
+	}
 	format, err := resolveFormat(formatArg)
 	if err != nil {
 		return config{}, err

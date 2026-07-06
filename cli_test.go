@@ -109,6 +109,32 @@ func TestRunUnknownFlagReturnsParseError(t *testing.T) {
 	}
 }
 
+func TestRunRequiresModelWhenEnvUnset(t *testing.T) {
+	withEnv(t, map[string]string{"OPENAI_MODEL": ""}, func() {
+		err := run([]string{
+			"--base-url", "http://example.com",
+			"--prompt", "hello",
+		})
+		if err == nil || !strings.Contains(err.Error(), "missing model") {
+			t.Fatalf("expected missing model error, got %v", err)
+		}
+	})
+}
+
+func TestRunRequiresBaseURLWhenEnvUnset(t *testing.T) {
+	withEnv(t, map[string]string{
+		"OPENAI_BASE_URL": "",
+		"OPENAI_MODEL":    "model",
+	}, func() {
+		err := run([]string{
+			"--prompt", "hello",
+		})
+		if err == nil || !strings.Contains(err.Error(), "missing base URL") {
+			t.Fatalf("expected missing base URL error, got %v", err)
+		}
+	})
+}
+
 func TestRunCombinesPositionalArgsIntoSingleMessage(t *testing.T) {
 	var captured chatCompletionRequest
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -129,6 +155,7 @@ func TestRunCombinesPositionalArgsIntoSingleMessage(t *testing.T) {
 		return run([]string{
 			"-u", server.URL,
 			"--api-key", "key",
+			"-m", "model",
 			"positional",
 			"user",
 			"parts",

@@ -18,7 +18,7 @@ Flags override environment variables.
 | --- | --- | --- | --- |
 | `--base-url` / `-u` | `OPENAI_BASE_URL` | Yes | none |
 | `--api-key` | `OPENAI_API_KEY` | No | unset |
-| `--model` / `-m` | `OPENAI_MODEL` | No | `gpt-4o-mini` |
+| `--model` / `-m` | `OPENAI_MODEL` | Yes | none |
 | `--format` / `-f` | n/a | No | `text` (`text` or `json`) |
 | `--temperature` | `OPENAI_TEMPERATURE` | No | unset |
 | `--top-p` | `OPENAI_TOP_P` | No | unset |
@@ -109,5 +109,6 @@ Use environment variables:
 ```bash
 export OPENAI_BASE_URL=http://localhost:1234
 export OPENAI_API_KEY=test-key
+export OPENAI_MODEL=gpt-4o-mini
 ./spit --prompt "Hello"
 ```
