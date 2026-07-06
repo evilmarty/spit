@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -80,6 +81,24 @@ func TestResolveConfigUsesShortEndpointBeforeEnv(t *testing.T) {
 		}
 		if cfg.APIKey != "" {
 			t.Fatalf("expected empty API key when unset, got %q", cfg.APIKey)
+		}
+	})
+}
+
+func TestResolveConfigDefaults(t *testing.T) {
+	withEnv(t, map[string]string{
+		"OPENAI_ENDPOINT": "",
+		"OPENAI_MODEL":    "",
+	}, func() {
+		cfg, err := resolveConfig("example.com", "", -1, "", "", "", "", "", -1, "", "")
+		if err != nil {
+			t.Fatalf("resolveConfig returned error: %v", err)
+		}
+		if cfg.Model != "gpt-4o-mini" {
+			t.Fatalf("expected default model, got %q", cfg.Model)
+		}
+		if cfg.Format != "text" {
+			t.Fatalf("expected default format text, got %q", cfg.Format)
 		}
 	})
 }
@@ -398,6 +417,15 @@ func TestRunRequiresUserMessage(t *testing.T) {
 	}
 }
 
+func TestRunUnknownFlagReturnsParseError(t *testing.T) {
+	_, err := captureStderr(t, func() error {
+		return run([]string{"--not-a-real-flag"})
+	})
+	if err == nil || !strings.Contains(err.Error(), "flag provided but not defined") {
+		t.Fatalf("expected flag parse error, got %v", err)
+	}
+}
+
 func TestRunCombinesPositionalArgsIntoSingleMessage(t *testing.T) {
 	var captured chatCompletionRequest
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -466,6 +494,307 @@ func TestHelpListsArguments(t *testing.T) {
 			t.Fatalf("expected help output to contain %q, got:\n%s", token, stderr)
 		}
 	}
+}
+
+func TestMessageCollectorAddRejectsEmpty(t *testing.T) {
+	collector := &messageCollector{}
+	err := collector.add("user", "   ")
+	if err == nil || !strings.Contains(err.Error(), "cannot be empty") {
+		t.Fatalf("expected empty prompt error, got %v", err)
+	}
+}
+
+func TestEnsureTrailingNewlineBehavior(t *testing.T) {
+	var out strings.Builder
+	writer := &newlineTrackingWriter{writer: &out}
+
+	if err := writer.ensureTrailingNewline(); err != nil {
+		t.Fatalf("unexpected error with empty writer: %v", err)
+	}
+	if out.String() != "" {
+		t.Fatalf("expected no output, got %q", out.String())
+	}
+
+	if _, err := writer.Write([]byte("hello")); err != nil {
+		t.Fatalf("write failed: %v", err)
+	}
+	if err := writer.ensureTrailingNewline(); err != nil {
+		t.Fatalf("ensureTrailingNewline failed: %v", err)
+	}
+	if out.String() != "hello\n" {
+		t.Fatalf("expected trailing newline added, got %q", out.String())
+	}
+
+	if _, err := writer.Write([]byte("already\n")); err != nil {
+		t.Fatalf("write failed: %v", err)
+	}
+	if err := writer.ensureTrailingNewline(); err != nil {
+		t.Fatalf("ensureTrailingNewline failed: %v", err)
+	}
+	if out.String() != "hello\nalready\n" {
+		t.Fatalf("expected no duplicate newline, got %q", out.String())
+	}
+}
+
+func TestReadStdinPromptCharDeviceAndPipe(t *testing.T) {
+	devNull, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatalf("failed to open %s: %v", os.DevNull, err)
+	}
+	defer devNull.Close()
+
+	prompt, err := readStdinPrompt(devNull)
+	if err != nil {
+		t.Fatalf("readStdinPrompt on char device failed: %v", err)
+	}
+	if prompt != "" {
+		t.Fatalf("expected empty prompt from char device, got %q", prompt)
+	}
+
+	readPipe, writePipe, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("failed to create pipe: %v", err)
+	}
+	_, _ = writePipe.WriteString("  hello from pipe  \n")
+	_ = writePipe.Close()
+	defer readPipe.Close()
+
+	prompt, err = readStdinPrompt(readPipe)
+	if err != nil {
+		t.Fatalf("readStdinPrompt on pipe failed: %v", err)
+	}
+	if prompt != "hello from pipe" {
+		t.Fatalf("unexpected prompt from pipe: %q", prompt)
+	}
+
+	closed, err := os.CreateTemp("", "closed-stdin-*")
+	if err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+	name := closed.Name()
+	_ = closed.Close()
+	_ = os.Remove(name)
+	if _, err := readStdinPrompt(closed); err == nil || !strings.Contains(err.Error(), "unable to inspect stdin") {
+		t.Fatalf("expected stat failure for closed file, got %v", err)
+	}
+}
+
+func TestResolvePortAndOptionalIntErrorPaths(t *testing.T) {
+	if _, err := resolvePort(0, "example.com"); err == nil {
+		t.Fatal("expected invalid port 0 error")
+	}
+
+	withEnv(t, map[string]string{"OPENAI_PORT": "not-a-number"}, func() {
+		_, err := resolvePort(-1, "example.com")
+		if err == nil || !strings.Contains(err.Error(), "invalid OPENAI_PORT value") {
+			t.Fatalf("expected invalid OPENAI_PORT error, got %v", err)
+		}
+	})
+
+	withEnv(t, map[string]string{"OPENAI_MAX_TOKENS": "bad"}, func() {
+		_, err := resolveOptionalInt(-1, "OPENAI_MAX_TOKENS")
+		if err == nil || !strings.Contains(err.Error(), "OPENAI_MAX_TOKENS") {
+			t.Fatalf("expected OPENAI_MAX_TOKENS parse error, got %v", err)
+		}
+	})
+
+	if envKeyOrFlag("") != "flag" {
+		t.Fatalf("expected envKeyOrFlag(\"\") to return flag, got %q", envKeyOrFlag(""))
+	}
+}
+
+func TestExecuteRequestAdditionalErrorPaths(t *testing.T) {
+	host, port := serverWithRawResponse(t, http.StatusOK, "application/json", `{"choices":[]}`)
+	_, err := executeRequest(config{
+		Endpoint: host,
+		Port:     port,
+		Model:    "m",
+		Messages: []chatMessage{{Role: "user", Content: "x"}},
+	})
+	if err == nil || !strings.Contains(err.Error(), "did not contain any choices") {
+		t.Fatalf("expected no choices error, got %v", err)
+	}
+
+	host, port = serverWithRawResponse(t, http.StatusOK, "application/json", `{"choices":[{"message":{"role":"assistant","content":"   "}}]}`)
+	_, err = executeRequest(config{
+		Endpoint: host,
+		Port:     port,
+		Model:    "m",
+		Messages: []chatMessage{{Role: "user", Content: "x"}},
+	})
+	if err == nil || !strings.Contains(err.Error(), "did not contain assistant content") {
+		t.Fatalf("expected empty assistant content error, got %v", err)
+	}
+
+	host, port = serverWithRawResponse(t, http.StatusOK, "application/json", `not-json`)
+	_, err = executeRequest(config{
+		Endpoint: host,
+		Port:     port,
+		Model:    "m",
+		Messages: []chatMessage{{Role: "user", Content: "x"}},
+	})
+	if err == nil || !strings.Contains(err.Error(), "unable to parse API response") {
+		t.Fatalf("expected parse error, got %v", err)
+	}
+
+	_, err = executeRequest(config{
+		Endpoint:  "example.com",
+		Port:      80,
+		Model:     "m",
+		Reasoning: json.RawMessage("{"),
+		Messages:  []chatMessage{{Role: "user", Content: "x"}},
+	})
+	if err == nil || !strings.Contains(err.Error(), "unable to encode request payload") {
+		t.Fatalf("expected marshal error, got %v", err)
+	}
+}
+
+func TestExecuteStreamingRequestAdditionalPaths(t *testing.T) {
+	host, port := serverWithRawResponse(t, http.StatusOK, "application/json", `{"choices":[{"message":{"role":"assistant","content":"ok"}}]}`)
+	var out strings.Builder
+	err := executeStreamingRequest(config{
+		Endpoint: host,
+		Port:     port,
+		Model:    "m",
+		Format:   "text",
+		Messages: []chatMessage{{Role: "user", Content: "x"}},
+	}, &out)
+	if err != nil {
+		t.Fatalf("non-sse fallback failed: %v", err)
+	}
+	if out.String() != "ok\n" {
+		t.Fatalf("expected fallback output with newline, got %q", out.String())
+	}
+
+	host, port = serverWithRawResponse(t, http.StatusOK, "application/json", `not-json`)
+	err = executeStreamingRequest(config{
+		Endpoint: host,
+		Port:     port,
+		Model:    "m",
+		Messages: []chatMessage{{Role: "user", Content: "x"}},
+	}, &strings.Builder{})
+	if err == nil || !strings.Contains(err.Error(), "unable to parse API response") {
+		t.Fatalf("expected non-sse parse error, got %v", err)
+	}
+
+	host, port = serverWithRawResponse(t, http.StatusBadRequest, "text/plain", `plain error`)
+	err = executeStreamingRequest(config{
+		Endpoint: host,
+		Port:     port,
+		Model:    "m",
+		Messages: []chatMessage{{Role: "user", Content: "x"}},
+	}, &strings.Builder{})
+	if err == nil || !strings.Contains(err.Error(), "plain error") {
+		t.Fatalf("expected status/body error, got %v", err)
+	}
+
+	host, port = serverWithRawResponse(t, http.StatusOK, "application/json", `{"choices":[]}`)
+	err = executeStreamingRequest(config{
+		Endpoint: host,
+		Port:     port,
+		Model:    "m",
+		Messages: []chatMessage{{Role: "user", Content: "x"}},
+	}, &strings.Builder{})
+	if err == nil || !strings.Contains(err.Error(), "did not contain any choices") {
+		t.Fatalf("expected no choices error, got %v", err)
+	}
+
+	host, port = serverWithRawResponse(t, http.StatusOK, "application/json", `{"choices":[{"message":{"role":"assistant","content":"   "}}]}`)
+	err = executeStreamingRequest(config{
+		Endpoint: host,
+		Port:     port,
+		Model:    "m",
+		Messages: []chatMessage{{Role: "user", Content: "x"}},
+	}, &strings.Builder{})
+	if err == nil || !strings.Contains(err.Error(), "did not contain assistant content") {
+		t.Fatalf("expected empty content error, got %v", err)
+	}
+
+	host, port = serverWithRawResponse(t, http.StatusOK, "application/json", `{"choices":[{"message":{"role":"assistant","content":"ok"}}]}`)
+	err = executeStreamingRequest(config{
+		Endpoint: host,
+		Port:     port,
+		Model:    "m",
+		Messages: []chatMessage{{Role: "user", Content: "x"}},
+	}, &failingWriter{})
+	if err == nil || !strings.Contains(err.Error(), "unable to write output") {
+		t.Fatalf("expected fallback write error, got %v", err)
+	}
+
+	err = executeStreamingRequest(config{
+		Endpoint:  "example.com",
+		Port:      80,
+		Model:     "m",
+		Reasoning: json.RawMessage("{"),
+		Messages:  []chatMessage{{Role: "user", Content: "x"}},
+	}, &strings.Builder{})
+	if err == nil || !strings.Contains(err.Error(), "unable to encode request payload") {
+		t.Fatalf("expected marshal error, got %v", err)
+	}
+}
+
+func TestWriteStreamingContentErrorPaths(t *testing.T) {
+	err := writeStreamingContent(strings.NewReader("data: {not-json}\n\n"), &strings.Builder{})
+	if err == nil || !strings.Contains(err.Error(), "unable to parse streaming chunk") {
+		t.Fatalf("expected chunk parse error, got %v", err)
+	}
+
+	err = writeStreamingContent(strings.NewReader("data: {\"choices\":[{\"delta\":{\"content\":\"x\"}}]}\n\n"), &failingWriter{})
+	if err == nil || !strings.Contains(err.Error(), "unable to write streaming output") {
+		t.Fatalf("expected write error, got %v", err)
+	}
+
+	err = writeStreamingContent(&failingReader{}, &strings.Builder{})
+	if err == nil || !strings.Contains(err.Error(), "stream read failed") {
+		t.Fatalf("expected scanner error, got %v", err)
+	}
+}
+
+func TestFormatAPIErrorAndBuildRequestURLErrorPaths(t *testing.T) {
+	err := formatAPIError("400 Bad Request", []byte(`{"error":{"message":"bad"}}`))
+	if err == nil || !strings.Contains(err.Error(), "bad") {
+		t.Fatalf("expected json error message, got %v", err)
+	}
+
+	err = formatAPIError("500 Internal Server Error", []byte(""))
+	if err == nil || !strings.Contains(err.Error(), "<empty response body>") {
+		t.Fatalf("expected empty body marker, got %v", err)
+	}
+
+	if _, err := buildRequestURL("", 80); err == nil {
+		t.Fatal("expected empty endpoint error")
+	}
+	if _, err := buildRequestURL("http:///", 80); err == nil {
+		t.Fatal("expected invalid host error")
+	}
+	if _, err := buildRequestURL("example.com", 0); err == nil {
+		t.Fatal("expected invalid port error")
+	}
+}
+
+type failingWriter struct{}
+
+func (f *failingWriter) Write(_ []byte) (int, error) {
+	return 0, errors.New("forced write failure")
+}
+
+type failingReader struct{}
+
+func (f *failingReader) Read(_ []byte) (int, error) {
+	return 0, errors.New("forced read failure")
+}
+
+func serverWithRawResponse(t *testing.T, status int, contentType, body string) (string, int) {
+	t.Helper()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", contentType)
+		w.WriteHeader(status)
+		_, _ = w.Write([]byte(body))
+	}))
+	t.Cleanup(server.Close)
+
+	return serverHostPort(t, server.URL)
 }
 
 func withEnv(t *testing.T, values map[string]string, fn func()) {
