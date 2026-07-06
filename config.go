@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -11,7 +10,7 @@ import (
 	"strings"
 )
 
-func resolveConfig(endpointArg, endpointShortArg string, portArg int, modelArg, apiKeyArg, formatArg, temperatureArg, topPArg string, maxTokensArg int, reasoningEffortArg, reasoningArg string) (config, error) {
+func resolveConfig(endpointArg, endpointShortArg string, portArg int, modelArg, apiKeyArg, formatArg, temperatureArg, topPArg string, maxTokensArg int, reasoningEffortArg string) (config, error) {
 	endpoint := resolveString(endpointArg, "", "")
 	if endpoint == "" {
 		endpoint = resolveString(endpointShortArg, "OPENAI_ENDPOINT", "")
@@ -40,10 +39,6 @@ func resolveConfig(endpointArg, endpointShortArg string, portArg int, modelArg, 
 		return config{}, err
 	}
 	reasoningEffort := resolveString(reasoningEffortArg, "OPENAI_REASONING_EFFORT", "")
-	reasoning, err := resolveOptionalJSON(reasoningArg, "OPENAI_REASONING")
-	if err != nil {
-		return config{}, err
-	}
 
 	port, err := resolvePort(portArg, endpoint)
 	if err != nil {
@@ -60,7 +55,6 @@ func resolveConfig(endpointArg, endpointShortArg string, portArg int, modelArg, 
 		TopP:            topP,
 		MaxTokens:       maxTokens,
 		ReasoningEffort: reasoningEffort,
-		Reasoning:       reasoning,
 	}, nil
 }
 
@@ -169,20 +163,6 @@ func resolveOptionalInt(argValue int, envKey string) (*int, error) {
 	}
 
 	return &parsed, nil
-}
-
-func resolveOptionalJSON(argValue, envKey string) (json.RawMessage, error) {
-	value := resolveString(argValue, envKey, "")
-	if value == "" {
-		return nil, nil
-	}
-
-	raw := json.RawMessage(strings.TrimSpace(value))
-	if !json.Valid(raw) {
-		return nil, fmt.Errorf("invalid %s JSON payload", envKeyOrFlag(envKey))
-	}
-
-	return raw, nil
 }
 
 func envKeyOrFlag(envKey string) string {

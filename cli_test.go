@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 )
@@ -40,7 +41,6 @@ func TestRunParsesNewFlagsAndPreservesMessageOrder(t *testing.T) {
 				"--prompt", "user 2",
 				"--top-p", "0.7",
 				"--reasoning-effort", "high",
-				"--reasoning", `{"mode":"test"}`,
 				"positional user",
 			})
 		})
@@ -84,9 +84,6 @@ func TestRunParsesNewFlagsAndPreservesMessageOrder(t *testing.T) {
 	}
 	if captured.ResponseFormat == nil || captured.ResponseFormat.Type != "json_object" {
 		t.Fatalf("expected json response_format, got %#v", captured.ResponseFormat)
-	}
-	if string(captured.Reasoning) != `{"mode":"test"}` {
-		t.Fatalf("expected reasoning JSON, got %s", string(captured.Reasoning))
 	}
 }
 
@@ -169,7 +166,6 @@ func TestHelpListsArguments(t *testing.T) {
 		"-top-p",
 		"-max_tokens",
 		"-reasoning-effort",
-		"-reasoning",
 		"-system",
 		"-s",
 		"-prompt",
@@ -230,5 +226,19 @@ func TestReadStdinPromptCharDeviceAndPipe(t *testing.T) {
 	_ = os.Remove(name)
 	if _, err := readStdinPrompt(closed); err == nil || !strings.Contains(err.Error(), "unable to inspect stdin") {
 		t.Fatalf("expected stat failure for closed file, got %v", err)
+	}
+}
+
+func TestMainHelpExitZero(t *testing.T) {
+	if os.Getenv("SPIT_TEST_MAIN_HELP") == "1" {
+		os.Args = []string{"spit", "--help"}
+		main()
+		return
+	}
+
+	cmd := exec.Command(os.Args[0], "-test.run=TestMainHelpExitZero")
+	cmd.Env = append(os.Environ(), "SPIT_TEST_MAIN_HELP=1")
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("expected main help path to exit 0, got error: %v", err)
 	}
 }

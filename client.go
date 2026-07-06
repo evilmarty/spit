@@ -26,7 +26,6 @@ func executeRequest(cfg config) (string, error) {
 		TopP:            cfg.TopP,
 		MaxTokens:       cfg.MaxTokens,
 		ReasoningEffort: cfg.ReasoningEffort,
-		Reasoning:       cfg.Reasoning,
 	}
 
 	body, err := json.Marshal(payload)
@@ -93,7 +92,6 @@ func executeStreamingRequest(cfg config, output io.Writer) error {
 		TopP:            cfg.TopP,
 		MaxTokens:       cfg.MaxTokens,
 		ReasoningEffort: cfg.ReasoningEffort,
-		Reasoning:       cfg.Reasoning,
 	}
 
 	body, err := json.Marshal(payload)

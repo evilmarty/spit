@@ -1,7 +1,5 @@
 package main
 
-import "encoding/json"
-
 type chatMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
@@ -16,7 +14,6 @@ type chatCompletionRequest struct {
 	TopP            *float64        `json:"top_p,omitempty"`
 	MaxTokens       *int            `json:"max_tokens,omitempty"`
 	ReasoningEffort string          `json:"reasoning_effort,omitempty"`
-	Reasoning       json.RawMessage `json:"reasoning,omitempty"`
 }
 
 type responseFormat struct {
@@ -45,7 +42,6 @@ type config struct {
 	TopP            *float64
 	MaxTokens       *int
 	ReasoningEffort string
-	Reasoning       json.RawMessage
 	Messages        []chatMessage
 }
 

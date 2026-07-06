@@ -47,7 +47,6 @@ func TestExecuteRequestSuccessAndPayload(t *testing.T) {
 		TopP:            &topP,
 		MaxTokens:       &maxTokens,
 		ReasoningEffort: "medium",
-		Reasoning:       json.RawMessage(`{"foo":"bar"}`),
 		Messages: []chatMessage{
 			{Role: "system", Content: "sys"},
 			{Role: "user", Content: "hello"},
@@ -85,9 +84,6 @@ func TestExecuteRequestSuccessAndPayload(t *testing.T) {
 	}
 	if captured.ResponseFormat != nil {
 		t.Fatalf("expected text format to omit response_format, got %#v", captured.ResponseFormat)
-	}
-	if string(captured.Reasoning) != `{"foo":"bar"}` {
-		t.Fatalf("reasoning mismatch: %s", string(captured.Reasoning))
 	}
 }
 
@@ -145,15 +141,33 @@ func TestExecuteRequestAdditionalErrorPaths(t *testing.T) {
 		t.Fatalf("expected parse error, got %v", err)
 	}
 
-	_, err = executeRequest(config{
-		Endpoint:  "example.com",
-		Port:      80,
-		Model:     "m",
-		Reasoning: json.RawMessage("{"),
-		Messages:  []chatMessage{{Role: "user", Content: "x"}},
+}
+
+func TestExecuteRequestWithoutAPIKeyOmitsAuthHeader(t *testing.T) {
+	var authHeader string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		authHeader = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"ok"}}]}`))
+	}))
+	defer server.Close()
+
+	host, port := serverHostPort(t, server.URL)
+	content, err := executeRequest(config{
+		Endpoint: host,
+		Port:     port,
+		Model:    "m",
+		APIKey:   "",
+		Messages: []chatMessage{{Role: "user", Content: "x"}},
 	})
-	if err == nil || !strings.Contains(err.Error(), "unable to encode request payload") {
-		t.Fatalf("expected marshal error, got %v", err)
+	if err != nil {
+		t.Fatalf("executeRequest returned error: %v", err)
+	}
+	if content != "ok" {
+		t.Fatalf("expected assistant content ok, got %q", content)
+	}
+	if authHeader != "" {
+		t.Fatalf("expected empty Authorization header, got %q", authHeader)
 	}
 }
 
@@ -258,15 +272,16 @@ func TestExecuteStreamingRequestAdditionalPaths(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "unable to write output") {
 		t.Fatalf("expected fallback write error, got %v", err)
 	}
+}
 
-	err = executeStreamingRequest(config{
-		Endpoint:  "example.com",
-		Port:      80,
-		Model:     "m",
-		Reasoning: json.RawMessage("{"),
-		Messages:  []chatMessage{{Role: "user", Content: "x"}},
+func TestExecuteStreamingRequestBuildURLFailure(t *testing.T) {
+	err := executeStreamingRequest(config{
+		Endpoint: "",
+		Port:     1234,
+		Model:    "m",
+		Messages: []chatMessage{{Role: "user", Content: "x"}},
 	}, &strings.Builder{})
-	if err == nil || !strings.Contains(err.Error(), "unable to encode request payload") {
-		t.Fatalf("expected marshal error, got %v", err)
+	if err == nil || !strings.Contains(err.Error(), "endpoint cannot be empty") {
+		t.Fatalf("expected endpoint validation error, got %v", err)
 	}
 }

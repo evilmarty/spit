@@ -21,7 +21,6 @@ func run(args []string) error {
 		topPArg            string
 		maxTokensArg       int
 		reasoningEffortArg string
-		reasoningArg       string
 	)
 
 	collector := &messageCollector{}
@@ -39,7 +38,6 @@ func run(args []string) error {
 	flags.StringVar(&topPArg, "top-p", "", "nucleus sampling top_p (env: OPENAI_TOP_P)")
 	flags.IntVar(&maxTokensArg, "max_tokens", -1, "max tokens to generate (env: OPENAI_MAX_TOKENS)")
 	flags.StringVar(&reasoningEffortArg, "reasoning-effort", "", "reasoning effort value (env: OPENAI_REASONING_EFFORT)")
-	flags.StringVar(&reasoningArg, "reasoning", "", "reasoning payload as JSON string (env: OPENAI_REASONING)")
 	flags.Func("system", "append a system prompt; repeat to add more", func(value string) error {
 		return collector.add("system", value)
 	})
@@ -64,7 +62,6 @@ func run(args []string) error {
 		fmt.Fprintln(os.Stderr, "  --top-p <float>                   Nucleus sampling top_p (env: OPENAI_TOP_P)")
 		fmt.Fprintln(os.Stderr, "  --max_tokens <int>                Max tokens to generate (env: OPENAI_MAX_TOKENS)")
 		fmt.Fprintln(os.Stderr, "  --reasoning-effort <value>        Reasoning effort (env: OPENAI_REASONING_EFFORT)")
-		fmt.Fprintln(os.Stderr, "  --reasoning <json>                Reasoning payload JSON (env: OPENAI_REASONING)")
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, "Message options (preserve CLI order in payload):")
 		fmt.Fprintln(os.Stderr, "  --system, -s <text>               Add a system message (repeatable)")
@@ -102,7 +99,7 @@ func run(args []string) error {
 		return errors.New("at least one user prompt is required")
 	}
 
-	cfg, err := resolveConfig(endpointArg, endpointShortArg, portArg, modelArg, apiKeyArg, formatArg, temperatureArg, topPArg, maxTokensArg, reasoningEffortArg, reasoningArg)
+	cfg, err := resolveConfig(endpointArg, endpointShortArg, portArg, modelArg, apiKeyArg, formatArg, temperatureArg, topPArg, maxTokensArg, reasoningEffortArg)
 	if err != nil {
 		return err
 	}

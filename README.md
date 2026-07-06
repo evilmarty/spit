@@ -25,7 +25,6 @@ Flags override environment variables.
 | `--top-p` | `OPENAI_TOP_P` | No | unset |
 | `--max_tokens` | `OPENAI_MAX_TOKENS` | No | unset |
 | `--reasoning-effort` | `OPENAI_REASONING_EFFORT` | No | unset |
-| `--reasoning` (JSON string) | `OPENAI_REASONING` | No | unset |
 
 Message args:
 
@@ -78,7 +77,6 @@ Run the built binary with explicit flags:
   --top-p 0.9 \
   --max_tokens 512 \
   --reasoning-effort medium \
-  --reasoning '{"effort":"medium"}' \
   -s "You are concise." \
   -p "Summarize this repository."
 ```

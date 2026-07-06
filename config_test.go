@@ -15,13 +15,12 @@ func TestResolveConfigPrecedenceAndOptions(t *testing.T) {
 		"OPENAI_TOP_P":            "0.9",
 		"OPENAI_MAX_TOKENS":       "111",
 		"OPENAI_REASONING_EFFORT": "medium",
-		"OPENAI_REASONING":        `{"depth":"low"}`,
 	}, func() {
 		cfg, err := resolveConfig(
 			"arg.example", "short.example", -1,
 			"arg-model", "arg-key",
 			"json", "0.7", "0.8", 99,
-			"high", `{"enabled":true}`,
+			"high",
 		)
 		if err != nil {
 			t.Fatalf("resolveConfig returned error: %v", err)
@@ -54,9 +53,6 @@ func TestResolveConfigPrecedenceAndOptions(t *testing.T) {
 		if cfg.ReasoningEffort != "high" {
 			t.Fatalf("expected reasoning_effort from flag, got %q", cfg.ReasoningEffort)
 		}
-		if string(cfg.Reasoning) != `{"enabled":true}` {
-			t.Fatalf("expected reasoning JSON from flag, got %s", string(cfg.Reasoning))
-		}
 	})
 }
 
@@ -65,7 +61,7 @@ func TestResolveConfigUsesShortEndpointBeforeEnv(t *testing.T) {
 		"OPENAI_ENDPOINT": "env.example",
 		"OPENAI_API_KEY":  "",
 	}, func() {
-		cfg, err := resolveConfig("", "short.example", -1, "", "", "", "", "", -1, "", "")
+		cfg, err := resolveConfig("", "short.example", -1, "", "", "", "", "", -1, "")
 		if err != nil {
 			t.Fatalf("resolveConfig returned error: %v", err)
 		}
@@ -83,7 +79,7 @@ func TestResolveConfigDefaults(t *testing.T) {
 		"OPENAI_ENDPOINT": "",
 		"OPENAI_MODEL":    "",
 	}, func() {
-		cfg, err := resolveConfig("example.com", "", -1, "", "", "", "", "", -1, "", "")
+		cfg, err := resolveConfig("example.com", "", -1, "", "", "", "", "", -1, "")
 		if err != nil {
 			t.Fatalf("resolveConfig returned error: %v", err)
 		}
@@ -101,7 +97,7 @@ func TestResolveConfigErrors(t *testing.T) {
 		"OPENAI_ENDPOINT": "",
 		"OPENAI_API_KEY":  "",
 	}, func() {
-		_, err := resolveConfig("", "", -1, "", "", "", "", "", -1, "", "")
+		_, err := resolveConfig("", "", -1, "", "", "", "", "", -1, "")
 		if err == nil || !strings.Contains(err.Error(), "missing endpoint") {
 			t.Fatalf("expected missing endpoint error, got %v", err)
 		}
@@ -111,7 +107,7 @@ func TestResolveConfigErrors(t *testing.T) {
 		"OPENAI_ENDPOINT": "example.com",
 		"OPENAI_API_KEY":  "key",
 	}, func() {
-		_, err := resolveConfig("", "", -1, "", "", "", "x", "", -1, "", "")
+		_, err := resolveConfig("", "", -1, "", "", "", "x", "", -1, "")
 		if err == nil || !strings.Contains(err.Error(), "OPENAI_TEMPERATURE") {
 			t.Fatalf("expected OPENAI_TEMPERATURE parse error, got %v", err)
 		}
@@ -119,18 +115,8 @@ func TestResolveConfigErrors(t *testing.T) {
 
 	withEnv(t, map[string]string{
 		"OPENAI_ENDPOINT": "example.com",
-		"OPENAI_API_KEY":  "key",
 	}, func() {
-		_, err := resolveConfig("", "", -1, "", "", "", "", "", -1, "", "{bad json")
-		if err == nil || !strings.Contains(err.Error(), "OPENAI_REASONING") {
-			t.Fatalf("expected OPENAI_REASONING JSON error, got %v", err)
-		}
-	})
-
-	withEnv(t, map[string]string{
-		"OPENAI_ENDPOINT": "example.com",
-	}, func() {
-		_, err := resolveConfig("", "", -1, "", "", "xml", "", "", -1, "", "")
+		_, err := resolveConfig("", "", -1, "", "", "xml", "", "", -1, "")
 		if err == nil || !strings.Contains(err.Error(), "supported values are text or json") {
 			t.Fatalf("expected format validation error, got %v", err)
 		}
