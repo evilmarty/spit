@@ -41,14 +41,6 @@ func writeStreamingContentWithIdleTimeout(input io.Reader, output io.Writer, idl
 	scanner := bufio.NewScanner(input)
 	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
 
-	type streamChunk struct {
-		Choices []struct {
-			Delta struct {
-				Content string `json:"content"`
-			} `json:"delta"`
-		} `json:"choices"`
-	}
-
 	lineCh := make(chan string)
 	errCh := make(chan error, 1)
 	done := make(chan struct{})
@@ -90,6 +82,25 @@ func writeStreamingContentWithIdleTimeout(input io.Reader, output io.Writer, idl
 		timer.Reset(idleTimeout)
 	}
 
+	var dataLines []string
+	flushEvent := func() error {
+		if len(dataLines) == 0 {
+			return nil
+		}
+
+		payload := strings.Join(dataLines, "\n")
+		dataLines = dataLines[:0]
+
+		if payload == "[DONE]" {
+			return io.EOF
+		}
+
+		if err := processStreamingEventPayload(payload, output); err != nil {
+			return err
+		}
+		return nil
+	}
+
 	for {
 		var timerCh <-chan time.Time
 		if timer != nil {
@@ -104,6 +115,12 @@ func writeStreamingContentWithIdleTimeout(input io.Reader, output io.Writer, idl
 			return fmt.Errorf("stream idle timeout after %s", idleTimeout)
 		case line, ok := <-lineCh:
 			if !ok {
+				if err := flushEvent(); err != nil {
+					if err == io.EOF {
+						return nil
+					}
+					return err
+				}
 				if err := <-errCh; err != nil {
 					return err
 				}
@@ -112,28 +129,47 @@ func writeStreamingContentWithIdleTimeout(input io.Reader, output io.Writer, idl
 			resetIdleTimer()
 
 			line = strings.TrimSpace(line)
-			if line == "" || !strings.HasPrefix(line, "data:") {
+			if line == "" {
+				if err := flushEvent(); err != nil {
+					if err == io.EOF {
+						return nil
+					}
+					return err
+				}
+				continue
+			}
+
+			if !strings.HasPrefix(line, "data:") {
 				continue
 			}
 
 			payload := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
-			if payload == "[DONE]" {
-				return nil
-			}
-
-			var chunk streamChunk
-			if err := json.Unmarshal([]byte(payload), &chunk); err != nil {
-				return fmt.Errorf("unable to parse streaming chunk: %w", err)
-			}
-
-			for _, choice := range chunk.Choices {
-				if choice.Delta.Content == "" {
-					continue
-				}
-				if _, err := io.WriteString(output, choice.Delta.Content); err != nil {
-					return fmt.Errorf("unable to write streaming output: %w", err)
-				}
-			}
+			dataLines = append(dataLines, payload)
 		}
 	}
+}
+
+func processStreamingEventPayload(payload string, output io.Writer) error {
+	type streamChunk struct {
+		Choices []struct {
+			Delta struct {
+				Content string `json:"content"`
+			} `json:"delta"`
+		} `json:"choices"`
+	}
+
+	var chunk streamChunk
+	if err := json.Unmarshal([]byte(payload), &chunk); err != nil {
+		return fmt.Errorf("unable to parse streaming chunk: %w", err)
+	}
+
+	for _, choice := range chunk.Choices {
+		if choice.Delta.Content == "" {
+			continue
+		}
+		if _, err := io.WriteString(output, choice.Delta.Content); err != nil {
+			return fmt.Errorf("unable to write streaming output: %w", err)
+		}
+	}
+	return nil
 }

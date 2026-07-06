@@ -72,3 +72,34 @@ func TestWriteStreamingContentWithIdleTimeout(t *testing.T) {
 		t.Fatalf("expected idle timeout error, got %v", err)
 	}
 }
+
+func TestWriteStreamingContentSupportsMultilineDataEvents(t *testing.T) {
+	input := strings.NewReader(
+		"event: message\n" +
+			"data: {\"choices\":[{\"delta\":\n" +
+			"data: {\"content\":\"hello\"}}]}\n" +
+			"\n" +
+			"data: [DONE]\n" +
+			"\n",
+	)
+
+	var out strings.Builder
+	if err := writeStreamingContent(input, &out); err != nil {
+		t.Fatalf("writeStreamingContent failed: %v", err)
+	}
+	if out.String() != "hello" {
+		t.Fatalf("expected multiline event output hello, got %q", out.String())
+	}
+}
+
+func TestWriteStreamingContentParsesFinalEventWithoutTrailingBlankLine(t *testing.T) {
+	input := strings.NewReader("data: {\"choices\":[{\"delta\":{\"content\":\"x\"}}]}\n")
+
+	var out strings.Builder
+	if err := writeStreamingContent(input, &out); err != nil {
+		t.Fatalf("writeStreamingContent failed: %v", err)
+	}
+	if out.String() != "x" {
+		t.Fatalf("expected output x, got %q", out.String())
+	}
+}
