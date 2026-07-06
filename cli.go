@@ -19,6 +19,8 @@ func run(args []string) error {
 		temperatureArg     string
 		topPArg            string
 		maxTokensArg       int
+		requestTimeoutArg  string
+		idleTimeoutArg     string
 		reasoningEffortArg string
 	)
 
@@ -35,6 +37,8 @@ func run(args []string) error {
 	flags.StringVar(&temperatureArg, "temperature", "", "sampling temperature (env: OPENAI_TEMPERATURE)")
 	flags.StringVar(&topPArg, "top-p", "", "nucleus sampling top_p (env: OPENAI_TOP_P)")
 	flags.IntVar(&maxTokensArg, "max_tokens", -1, "max tokens to generate (env: OPENAI_MAX_TOKENS)")
+	flags.StringVar(&requestTimeoutArg, "request-timeout", "", "request timeout duration (env: OPENAI_REQUEST_TIMEOUT)")
+	flags.StringVar(&idleTimeoutArg, "idle-timeout", "", "idle stream timeout duration (env: OPENAI_IDLE_TIMEOUT)")
 	flags.StringVar(&reasoningEffortArg, "reasoning-effort", "", "reasoning effort value (env: OPENAI_REASONING_EFFORT)")
 	flags.Func("system", "append a system prompt; repeat to add more", func(value string) error {
 		return collector.add("system", value)
@@ -58,6 +62,8 @@ func run(args []string) error {
 		fmt.Fprintln(os.Stderr, "  --temperature <float>             Sampling temperature (env: OPENAI_TEMPERATURE)")
 		fmt.Fprintln(os.Stderr, "  --top-p <float>                   Nucleus sampling top_p (env: OPENAI_TOP_P)")
 		fmt.Fprintln(os.Stderr, "  --max_tokens <int>                Max tokens to generate (env: OPENAI_MAX_TOKENS)")
+		fmt.Fprintln(os.Stderr, "  --request-timeout <duration>      Request timeout (env: OPENAI_REQUEST_TIMEOUT)")
+		fmt.Fprintln(os.Stderr, "  --idle-timeout <duration>         Idle stream timeout (env: OPENAI_IDLE_TIMEOUT)")
 		fmt.Fprintln(os.Stderr, "  --reasoning-effort <value>        Reasoning effort (env: OPENAI_REASONING_EFFORT)")
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, "Message options (preserve CLI order in payload):")
@@ -96,7 +102,13 @@ func run(args []string) error {
 		return errors.New("at least one user prompt is required")
 	}
 
-	cfg, err := resolveConfig(baseURLArg, baseURLShortArg, modelArg, apiKeyArg, formatArg, temperatureArg, topPArg, maxTokensArg, reasoningEffortArg)
+	cfg, err := resolveConfig(
+		baseURLArg, baseURLShortArg,
+		modelArg, apiKeyArg,
+		formatArg, temperatureArg, topPArg, maxTokensArg,
+		requestTimeoutArg, idleTimeoutArg,
+		reasoningEffortArg,
+	)
 	if err != nil {
 		return err
 	}

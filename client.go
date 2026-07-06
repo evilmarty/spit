@@ -43,7 +43,11 @@ func executeRequest(cfg config) (string, error) {
 		request.Header.Set("Authorization", "Bearer "+cfg.APIKey)
 	}
 
-	client := &http.Client{Timeout: 60 * time.Second}
+	timeout := 60 * time.Second
+	if cfg.RequestTimeout != nil {
+		timeout = *cfg.RequestTimeout
+	}
+	client := &http.Client{Timeout: timeout}
 	response, err := client.Do(request)
 	if err != nil {
 		return "", fmt.Errorf("request failed: %w", err)
@@ -109,7 +113,7 @@ func executeStreamingRequest(cfg config, output io.Writer) error {
 		request.Header.Set("Authorization", "Bearer "+cfg.APIKey)
 	}
 
-	client := &http.Client{}
+	client := newStreamingHTTPClient(cfg.RequestTimeout)
 	response, err := client.Do(request)
 	if err != nil {
 		return fmt.Errorf("request failed: %w", err)
@@ -148,10 +152,29 @@ func executeStreamingRequest(cfg config, output io.Writer) error {
 		return trackedOutput.ensureTrailingNewline()
 	}
 
-	if err := writeStreamingContent(response.Body, trackedOutput); err != nil {
+	idleTimeout := time.Duration(0)
+	if cfg.IdleTimeout != nil {
+		idleTimeout = *cfg.IdleTimeout
+	}
+	if err := writeStreamingContentWithIdleTimeout(response.Body, trackedOutput, idleTimeout); err != nil {
 		return err
 	}
 	return trackedOutput.ensureTrailingNewline()
+}
+
+func newStreamingHTTPClient(requestTimeout *time.Duration) *http.Client {
+	if requestTimeout == nil {
+		return &http.Client{}
+	}
+
+	baseTransport, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		return &http.Client{}
+	}
+	transport := baseTransport.Clone()
+	transport.ResponseHeaderTimeout = *requestTimeout
+
+	return &http.Client{Transport: transport}
 }
 
 func formatAPIError(status string, responseBody []byte) error {

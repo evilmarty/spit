@@ -3,6 +3,7 @@ package main
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestResolveConfigPrecedenceAndOptions(t *testing.T) {
@@ -13,12 +14,15 @@ func TestResolveConfigPrecedenceAndOptions(t *testing.T) {
 		"OPENAI_TEMPERATURE":      "0.42",
 		"OPENAI_TOP_P":            "0.9",
 		"OPENAI_MAX_TOKENS":       "111",
+		"OPENAI_REQUEST_TIMEOUT":  "30s",
+		"OPENAI_IDLE_TIMEOUT":     "45s",
 		"OPENAI_REASONING_EFFORT": "medium",
 	}, func() {
 		cfg, err := resolveConfig(
 			"http://arg.example:9000", "http://short.example:7000",
 			"arg-model", "arg-key",
 			"json", "0.7", "0.8", 99,
+			"2s", "3s",
 			"high",
 		)
 		if err != nil {
@@ -46,6 +50,12 @@ func TestResolveConfigPrecedenceAndOptions(t *testing.T) {
 		if cfg.MaxTokens == nil || *cfg.MaxTokens != 99 {
 			t.Fatalf("expected max_tokens 99, got %#v", cfg.MaxTokens)
 		}
+		if cfg.RequestTimeout == nil || *cfg.RequestTimeout != 2*time.Second {
+			t.Fatalf("expected request timeout 2s, got %#v", cfg.RequestTimeout)
+		}
+		if cfg.IdleTimeout == nil || *cfg.IdleTimeout != 3*time.Second {
+			t.Fatalf("expected idle timeout 3s, got %#v", cfg.IdleTimeout)
+		}
 		if cfg.ReasoningEffort != "high" {
 			t.Fatalf("expected reasoning_effort from flag, got %q", cfg.ReasoningEffort)
 		}
@@ -57,7 +67,7 @@ func TestResolveConfigUsesShortBaseURLBeforeEnv(t *testing.T) {
 		"OPENAI_BASE_URL": "http://env.example:8123",
 		"OPENAI_API_KEY":  "",
 	}, func() {
-		cfg, err := resolveConfig("", "http://short.example:7000", "", "", "", "", "", -1, "")
+		cfg, err := resolveConfig("", "http://short.example:7000", "", "", "", "", "", -1, "", "", "")
 		if err != nil {
 			t.Fatalf("resolveConfig returned error: %v", err)
 		}
@@ -75,7 +85,7 @@ func TestResolveConfigDefaults(t *testing.T) {
 		"OPENAI_BASE_URL": "",
 		"OPENAI_MODEL":    "",
 	}, func() {
-		cfg, err := resolveConfig("http://example.com", "", "", "", "", "", "", -1, "")
+		cfg, err := resolveConfig("http://example.com", "", "", "", "", "", "", -1, "", "", "")
 		if err != nil {
 			t.Fatalf("resolveConfig returned error: %v", err)
 		}
@@ -85,6 +95,12 @@ func TestResolveConfigDefaults(t *testing.T) {
 		if cfg.Format != "text" {
 			t.Fatalf("expected default format text, got %q", cfg.Format)
 		}
+		if cfg.RequestTimeout != nil {
+			t.Fatalf("expected nil request timeout by default, got %#v", cfg.RequestTimeout)
+		}
+		if cfg.IdleTimeout != nil {
+			t.Fatalf("expected nil idle timeout by default, got %#v", cfg.IdleTimeout)
+		}
 	})
 }
 
@@ -93,7 +109,7 @@ func TestResolveConfigErrors(t *testing.T) {
 		"OPENAI_BASE_URL": "",
 		"OPENAI_API_KEY":  "",
 	}, func() {
-		_, err := resolveConfig("", "", "", "", "", "", "", -1, "")
+		_, err := resolveConfig("", "", "", "", "", "", "", -1, "", "", "")
 		if err == nil || !strings.Contains(err.Error(), "missing base URL") {
 			t.Fatalf("expected missing base URL error, got %v", err)
 		}
@@ -103,7 +119,7 @@ func TestResolveConfigErrors(t *testing.T) {
 		"OPENAI_BASE_URL": "http://example.com",
 		"OPENAI_API_KEY":  "key",
 	}, func() {
-		_, err := resolveConfig("", "", "", "", "", "x", "", -1, "")
+		_, err := resolveConfig("", "", "", "", "", "x", "", -1, "", "", "")
 		if err == nil || !strings.Contains(err.Error(), "OPENAI_TEMPERATURE") {
 			t.Fatalf("expected OPENAI_TEMPERATURE parse error, got %v", err)
 		}
@@ -112,9 +128,22 @@ func TestResolveConfigErrors(t *testing.T) {
 	withEnv(t, map[string]string{
 		"OPENAI_BASE_URL": "http://example.com",
 	}, func() {
-		_, err := resolveConfig("", "", "", "", "xml", "", "", -1, "")
+		_, err := resolveConfig("", "", "", "", "xml", "", "", -1, "", "", "")
 		if err == nil || !strings.Contains(err.Error(), "supported values are text or json") {
 			t.Fatalf("expected format validation error, got %v", err)
+		}
+	})
+
+	withEnv(t, map[string]string{
+		"OPENAI_BASE_URL":         "http://example.com",
+		"OPENAI_REQUEST_TIMEOUT":  "nope",
+		"OPENAI_IDLE_TIMEOUT":     "",
+		"OPENAI_TEMPERATURE":      "",
+		"OPENAI_REASONING_EFFORT": "",
+	}, func() {
+		_, err := resolveConfig("", "", "", "", "", "", "", -1, "", "", "")
+		if err == nil || !strings.Contains(err.Error(), "OPENAI_REQUEST_TIMEOUT") {
+			t.Fatalf("expected OPENAI_REQUEST_TIMEOUT parse error, got %v", err)
 		}
 	})
 }
@@ -155,6 +184,19 @@ func TestResolveOptionalIntErrorPaths(t *testing.T) {
 
 	if envKeyOrFlag("") != "flag" {
 		t.Fatalf("expected envKeyOrFlag(\"\") to return flag, got %q", envKeyOrFlag(""))
+	}
+}
+
+func TestResolveOptionalDurationErrorPaths(t *testing.T) {
+	withEnv(t, map[string]string{"OPENAI_IDLE_TIMEOUT": "bad"}, func() {
+		_, err := resolveOptionalDuration("", "OPENAI_IDLE_TIMEOUT")
+		if err == nil || !strings.Contains(err.Error(), "OPENAI_IDLE_TIMEOUT") {
+			t.Fatalf("expected OPENAI_IDLE_TIMEOUT parse error, got %v", err)
+		}
+	})
+
+	if _, err := resolveOptionalDuration("0s", "OPENAI_IDLE_TIMEOUT"); err == nil {
+		t.Fatal("expected non-positive duration error")
 	}
 }
 

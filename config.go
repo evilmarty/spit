@@ -7,9 +7,17 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
-func resolveConfig(baseURLArg, baseURLShortArg, modelArg, apiKeyArg, formatArg, temperatureArg, topPArg string, maxTokensArg int, reasoningEffortArg string) (config, error) {
+func resolveConfig(
+	baseURLArg, baseURLShortArg,
+	modelArg, apiKeyArg,
+	formatArg, temperatureArg, topPArg string,
+	maxTokensArg int,
+	requestTimeoutArg, idleTimeoutArg,
+	reasoningEffortArg string,
+) (config, error) {
 	baseURL := resolveString(baseURLArg, "", "")
 	if baseURL == "" {
 		baseURL = resolveString(baseURLShortArg, "OPENAI_BASE_URL", "")
@@ -37,6 +45,14 @@ func resolveConfig(baseURLArg, baseURLShortArg, modelArg, apiKeyArg, formatArg, 
 	if err != nil {
 		return config{}, err
 	}
+	requestTimeout, err := resolveOptionalDuration(requestTimeoutArg, "OPENAI_REQUEST_TIMEOUT")
+	if err != nil {
+		return config{}, err
+	}
+	idleTimeout, err := resolveOptionalDuration(idleTimeoutArg, "OPENAI_IDLE_TIMEOUT")
+	if err != nil {
+		return config{}, err
+	}
 	reasoningEffort := resolveString(reasoningEffortArg, "OPENAI_REASONING_EFFORT", "")
 
 	return config{
@@ -47,6 +63,8 @@ func resolveConfig(baseURLArg, baseURLShortArg, modelArg, apiKeyArg, formatArg, 
 		Temperature:     temperature,
 		TopP:            topP,
 		MaxTokens:       maxTokens,
+		RequestTimeout:  requestTimeout,
+		IdleTimeout:     idleTimeout,
 		ReasoningEffort: reasoningEffort,
 	}, nil
 }
@@ -112,6 +130,20 @@ func resolveOptionalInt(argValue int, envKey string) (*int, error) {
 	parsed, err := strconv.Atoi(envValue)
 	if err != nil || parsed < 0 {
 		return nil, fmt.Errorf("invalid %s value %q", envKeyOrFlag(envKey), envValue)
+	}
+
+	return &parsed, nil
+}
+
+func resolveOptionalDuration(argValue, envKey string) (*time.Duration, error) {
+	value := resolveString(argValue, envKey, "")
+	if value == "" {
+		return nil, nil
+	}
+
+	parsed, err := time.ParseDuration(value)
+	if err != nil || parsed <= 0 {
+		return nil, fmt.Errorf("invalid %s value %q", envKeyOrFlag(envKey), value)
 	}
 
 	return &parsed, nil

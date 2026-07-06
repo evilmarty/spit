@@ -1,5 +1,7 @@
 package main
 
+import "time"
+
 type chatMessage struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
@@ -40,6 +42,8 @@ type config struct {
 	Temperature     *float64
 	TopP            *float64
 	MaxTokens       *int
+	RequestTimeout  *time.Duration
+	IdleTimeout     *time.Duration
 	ReasoningEffort string
 	Messages        []chatMessage
 }

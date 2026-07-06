@@ -23,6 +23,8 @@ Flags override environment variables.
 | `--temperature` | `OPENAI_TEMPERATURE` | No | unset |
 | `--top-p` | `OPENAI_TOP_P` | No | unset |
 | `--max_tokens` | `OPENAI_MAX_TOKENS` | No | unset |
+| `--request-timeout` | `OPENAI_REQUEST_TIMEOUT` | No | unset (duration, e.g. `10s`) |
+| `--idle-timeout` | `OPENAI_IDLE_TIMEOUT` | No | unset (duration, e.g. `30s`) |
 | `--reasoning-effort` | `OPENAI_REASONING_EFFORT` | No | unset |
 
 Message args:
@@ -74,6 +76,8 @@ Run the built binary with explicit flags:
   --temperature 0.7 \
   --top-p 0.9 \
   --max_tokens 512 \
+  --request-timeout 10s \
+  --idle-timeout 30s \
   --reasoning-effort medium \
   -s "You are concise." \
   -p "Summarize this repository."

@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestExecuteRequestSuccessAndPayload(t *testing.T) {
@@ -264,5 +265,61 @@ func TestExecuteStreamingRequestBuildURLFailure(t *testing.T) {
 	}, &strings.Builder{})
 	if err == nil || !strings.Contains(err.Error(), "base URL cannot be empty") {
 		t.Fatalf("expected base URL validation error, got %v", err)
+	}
+}
+
+func TestExecuteStreamingRequestRequestTimeout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(150 * time.Millisecond)
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: [DONE]\n\n"))
+	}))
+	defer server.Close()
+
+	requestTimeout := 20 * time.Millisecond
+	err := executeStreamingRequest(config{
+		BaseURL:        server.URL,
+		Model:          "m",
+		RequestTimeout: &requestTimeout,
+		Messages:       []chatMessage{{Role: "user", Content: "x"}},
+	}, &strings.Builder{})
+	if err == nil || !strings.Contains(err.Error(), "request failed") {
+		t.Fatalf("expected request timeout failure, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "timeout awaiting response headers") &&
+		!strings.Contains(err.Error(), "context deadline exceeded") {
+		t.Fatalf("expected timeout details in error, got %v", err)
+	}
+}
+
+func TestExecuteStreamingRequestIdleTimeout(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			t.Fatal("response writer does not implement http.Flusher")
+		}
+
+		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"first\"}}]}\n\n"))
+		flusher.Flush()
+		time.Sleep(120 * time.Millisecond)
+		_, _ = w.Write([]byte("data: [DONE]\n\n"))
+		flusher.Flush()
+	}))
+	defer server.Close()
+
+	idleTimeout := 40 * time.Millisecond
+	var out strings.Builder
+	err := executeStreamingRequest(config{
+		BaseURL:     server.URL,
+		Model:       "m",
+		IdleTimeout: &idleTimeout,
+		Messages:    []chatMessage{{Role: "user", Content: "x"}},
+	}, &out)
+	if err == nil || !strings.Contains(err.Error(), "stream idle timeout after") {
+		t.Fatalf("expected idle timeout failure, got %v", err)
+	}
+	if !strings.Contains(out.String(), "first") {
+		t.Fatalf("expected partial streamed output before timeout, got %q", out.String())
 	}
 }

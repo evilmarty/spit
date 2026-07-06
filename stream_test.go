@@ -1,8 +1,10 @@
 package main
 
 import (
+	"io"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestEnsureTrailingNewlineBehavior(t *testing.T) {
@@ -51,5 +53,22 @@ func TestWriteStreamingContentErrorPaths(t *testing.T) {
 	err = writeStreamingContent(&failingReader{}, &strings.Builder{})
 	if err == nil || !strings.Contains(err.Error(), "stream read failed") {
 		t.Fatalf("expected scanner error, got %v", err)
+	}
+}
+
+func TestWriteStreamingContentWithIdleTimeout(t *testing.T) {
+	readPipe, writePipe := io.Pipe()
+	defer readPipe.Close()
+
+	go func() {
+		_, _ = io.WriteString(writePipe, "data: {\"choices\":[{\"delta\":{\"content\":\"x\"}}]}\n\n")
+		time.Sleep(120 * time.Millisecond)
+		_, _ = io.WriteString(writePipe, "data: [DONE]\n\n")
+		_ = writePipe.Close()
+	}()
+
+	err := writeStreamingContentWithIdleTimeout(readPipe, &strings.Builder{}, 40*time.Millisecond)
+	if err == nil || !strings.Contains(err.Error(), "stream idle timeout after") {
+		t.Fatalf("expected idle timeout error, got %v", err)
 	}
 }

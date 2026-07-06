@@ -9,7 +9,7 @@ Core behavior:
 - Accepts base URL configuration (`--base-url`/`-u`)
 - Accepts ordered message inputs from `--system`/`-s`, `--prompt`/`-p`, positional args, and optional stdin
 - Sends one chat-completions request with `stream: true`
-- Supports optional generation controls (`--model`, `--format`, `--temperature`, `--top-p`, `--max_tokens`, `--reasoning-effort`)
+- Supports optional generation/lifecycle controls (`--model`, `--format`, `--temperature`, `--top-p`, `--max_tokens`, `--request-timeout`, `--idle-timeout`, `--reasoning-effort`)
 - Appends a trailing newline after stream completion (without duplicating an existing newline)
 
 ## Testing requirements
