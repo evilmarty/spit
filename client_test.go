@@ -344,3 +344,28 @@ func TestExecuteRequestWithContextInterrupt(t *testing.T) {
 		t.Fatalf("expected interrupt error, got %v", err)
 	}
 }
+
+func TestDecodeAssistantContentPaths(t *testing.T) {
+	content, err := decodeAssistantContent([]byte(`{"choices":[{"message":{"role":"assistant","content":" ok "}}]}`))
+	if err != nil {
+		t.Fatalf("expected success, got %v", err)
+	}
+	if content != "ok" {
+		t.Fatalf("expected trimmed content, got %q", content)
+	}
+
+	_, err = decodeAssistantContent([]byte(`not-json`))
+	if err == nil || !strings.Contains(err.Error(), "unable to parse API response") {
+		t.Fatalf("expected parse error, got %v", err)
+	}
+
+	_, err = decodeAssistantContent([]byte(`{"choices":[]}`))
+	if err == nil || !strings.Contains(err.Error(), "did not contain any choices") {
+		t.Fatalf("expected no choices error, got %v", err)
+	}
+
+	_, err = decodeAssistantContent([]byte(`{"choices":[{"message":{"role":"assistant","content":"   "}}]}`))
+	if err == nil || !strings.Contains(err.Error(), "did not contain assistant content") {
+		t.Fatalf("expected empty content error, got %v", err)
+	}
+}

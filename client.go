@@ -73,21 +73,7 @@ func executeRequestWithContext(ctx context.Context, cfg config) (string, error) 
 		return "", formatAPIError(response.Status, responseBody)
 	}
 
-	var parsed chatCompletionResponse
-	if err := json.Unmarshal(responseBody, &parsed); err != nil {
-		return "", fmt.Errorf("unable to parse API response: %w", err)
-	}
-
-	if len(parsed.Choices) == 0 {
-		return "", errors.New("API response did not contain any choices")
-	}
-
-	content := strings.TrimSpace(parsed.Choices[0].Message.Content)
-	if content == "" {
-		return "", errors.New("API response did not contain assistant content")
-	}
-
-	return content, nil
+	return decodeAssistantContent(responseBody)
 }
 
 func executeStreamingRequest(cfg config, output io.Writer) error {
@@ -155,17 +141,9 @@ func executeStreamingRequestWithContext(ctx context.Context, cfg config, output 
 			return fmt.Errorf("unable to read API response: %w", err)
 		}
 
-		var parsed chatCompletionResponse
-		if err := json.Unmarshal(responseBody, &parsed); err != nil {
-			return fmt.Errorf("unable to parse API response: %w", err)
-		}
-		if len(parsed.Choices) == 0 {
-			return errors.New("API response did not contain any choices")
-		}
-
-		content := strings.TrimSpace(parsed.Choices[0].Message.Content)
-		if content == "" {
-			return errors.New("API response did not contain assistant content")
+		content, err := decodeAssistantContent(responseBody)
+		if err != nil {
+			return err
 		}
 		if _, err := io.WriteString(trackedOutput, content); err != nil {
 			return fmt.Errorf("unable to write output: %w", err)
@@ -218,4 +196,22 @@ func formatAPIError(status string, responseBody []byte) error {
 	}
 
 	return fmt.Errorf("API request failed (%s): %s", status, body)
+}
+
+func decodeAssistantContent(responseBody []byte) (string, error) {
+	var parsed chatCompletionResponse
+	if err := json.Unmarshal(responseBody, &parsed); err != nil {
+		return "", fmt.Errorf("unable to parse API response: %w", err)
+	}
+
+	if len(parsed.Choices) == 0 {
+		return "", errors.New("API response did not contain any choices")
+	}
+
+	content := strings.TrimSpace(parsed.Choices[0].Message.Content)
+	if content == "" {
+		return "", errors.New("API response did not contain assistant content")
+	}
+
+	return content, nil
 }
