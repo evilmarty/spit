@@ -36,11 +36,11 @@ func resolveConfig(
 	if err != nil {
 		return config{}, err
 	}
-	temperature, err := resolveOptionalFloat(temperatureArg, "OPENAI_TEMPERATURE")
+	temperature, err := resolveOptionalFloatInRange(temperatureArg, "OPENAI_TEMPERATURE", 0, 2)
 	if err != nil {
 		return config{}, err
 	}
-	topP, err := resolveOptionalFloat(topPArg, "OPENAI_TOP_P")
+	topP, err := resolveOptionalFloatInRange(topPArg, "OPENAI_TOP_P", 0, 1)
 	if err != nil {
 		return config{}, err
 	}
@@ -117,6 +117,20 @@ func resolveOptionalFloat(argValue, envKey string) (*float64, error) {
 	}
 
 	return &parsed, nil
+}
+
+func resolveOptionalFloatInRange(argValue, envKey string, min, max float64) (*float64, error) {
+	parsed, err := resolveOptionalFloat(argValue, envKey)
+	if err != nil {
+		return nil, err
+	}
+	if parsed == nil {
+		return nil, nil
+	}
+	if *parsed < min || *parsed > max {
+		return nil, fmt.Errorf("invalid %s value %q; expected between %g and %g", envKeyOrFlag(envKey), strconv.FormatFloat(*parsed, 'f', -1, 64), min, max)
+	}
+	return parsed, nil
 }
 
 func resolveOptionalInt(argValue int, envKey string) (*int, error) {

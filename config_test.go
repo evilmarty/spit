@@ -141,9 +141,30 @@ func TestResolveConfigErrors(t *testing.T) {
 		"OPENAI_BASE_URL": "http://example.com",
 		"OPENAI_MODEL":    "model",
 	}, func() {
+		_, err := resolveConfig("", "", "", "", "", "2.1", "", -1, "", "", "")
+		if err == nil || !strings.Contains(err.Error(), "OPENAI_TEMPERATURE") || !strings.Contains(err.Error(), "between 0 and 2") {
+			t.Fatalf("expected OPENAI_TEMPERATURE range error, got %v", err)
+		}
+	})
+
+	withEnv(t, map[string]string{
+		"OPENAI_BASE_URL": "http://example.com",
+		"OPENAI_MODEL":    "model",
+	}, func() {
 		_, err := resolveConfig("", "", "", "", "xml", "", "", -1, "", "", "")
 		if err == nil || !strings.Contains(err.Error(), "supported values are text or json") {
 			t.Fatalf("expected format validation error, got %v", err)
+		}
+	})
+
+	withEnv(t, map[string]string{
+		"OPENAI_BASE_URL": "http://example.com",
+		"OPENAI_MODEL":    "model",
+		"OPENAI_TOP_P":    "1.1",
+	}, func() {
+		_, err := resolveConfig("", "", "", "", "", "", "", -1, "", "", "")
+		if err == nil || !strings.Contains(err.Error(), "OPENAI_TOP_P") || !strings.Contains(err.Error(), "between 0 and 1") {
+			t.Fatalf("expected OPENAI_TOP_P range error, got %v", err)
 		}
 	})
 
@@ -153,6 +174,7 @@ func TestResolveConfigErrors(t *testing.T) {
 		"OPENAI_REQUEST_TIMEOUT":  "nope",
 		"OPENAI_IDLE_TIMEOUT":     "",
 		"OPENAI_TEMPERATURE":      "",
+		"OPENAI_TOP_P":            "",
 		"OPENAI_REASONING_EFFORT": "",
 	}, func() {
 		_, err := resolveConfig("", "", "", "", "", "", "", -1, "", "", "")
@@ -198,6 +220,12 @@ func TestResolveOptionalIntErrorPaths(t *testing.T) {
 
 	if envKeyOrFlag("") != "flag" {
 		t.Fatalf("expected envKeyOrFlag(\"\") to return flag, got %q", envKeyOrFlag(""))
+	}
+}
+
+func TestResolveOptionalFloatInRangeErrorPaths(t *testing.T) {
+	if _, err := resolveOptionalFloatInRange("3", "OPENAI_TEMPERATURE", 0, 2); err == nil {
+		t.Fatal("expected out-of-range error")
 	}
 }
 

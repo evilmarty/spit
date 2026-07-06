@@ -25,8 +25,8 @@ Flags override environment variables.
 | `--api-key` | `OPENAI_API_KEY` | No | unset |
 | `--model` / `-m` | `OPENAI_MODEL` | Yes | none |
 | `--format` / `-f` | n/a | No | `text` (`text` or `json`) |
-| `--temperature` | `OPENAI_TEMPERATURE` | No | unset |
-| `--top-p` | `OPENAI_TOP_P` | No | unset |
+| `--temperature` | `OPENAI_TEMPERATURE` | No | unset (0 to 2) |
+| `--top-p` | `OPENAI_TOP_P` | No | unset (0 to 1) |
 | `--max_tokens` | `OPENAI_MAX_TOKENS` | No | unset |
 | `--request-timeout` | `OPENAI_REQUEST_TIMEOUT` | No | unset (duration, e.g. `10s`) |
 | `--idle-timeout` | `OPENAI_IDLE_TIMEOUT` | No | unset (duration, e.g. `30s`) |
