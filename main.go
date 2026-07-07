@@ -10,6 +10,12 @@ import (
 	"syscall"
 )
 
+var (
+	BuildDate = "unknown"
+	Version   = "dev"
+	Commit    = "none"
+)
+
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

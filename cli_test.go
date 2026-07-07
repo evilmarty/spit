@@ -156,6 +156,39 @@ func TestRunHelpIncludesDefaultBaseURLAndModel(t *testing.T) {
 	if !strings.Contains(stderr, "default: llama3") {
 		t.Fatalf("expected help to include default model, got:\n%s", stderr)
 	}
+	if !strings.Contains(stderr, "--version") {
+		t.Fatalf("expected help to include --version flag, got:\n%s", stderr)
+	}
+}
+
+func TestRunVersionPrintsBuildMetadata(t *testing.T) {
+	originalVersion := Version
+	originalBuildDate := BuildDate
+	originalCommit := Commit
+	Version = "1.2.3"
+	BuildDate = "2026-07-07T04:00:00Z"
+	Commit = "abc123"
+	t.Cleanup(func() {
+		Version = originalVersion
+		BuildDate = originalBuildDate
+		Commit = originalCommit
+	})
+
+	stdout, err := captureStdout(t, func() error {
+		return run([]string{"--version"})
+	})
+	if err != nil {
+		t.Fatalf("expected --version to succeed, got %v", err)
+	}
+	if !strings.Contains(stdout, "Version: 1.2.3") {
+		t.Fatalf("expected version in output, got %q", stdout)
+	}
+	if !strings.Contains(stdout, "BuildDate: 2026-07-07T04:00:00Z") {
+		t.Fatalf("expected build date in output, got %q", stdout)
+	}
+	if !strings.Contains(stdout, "Commit: abc123") {
+		t.Fatalf("expected commit in output, got %q", stdout)
+	}
 }
 
 func TestRunWithContextInterruptKeepsPartialOutputAndNewline(t *testing.T) {
@@ -257,6 +290,7 @@ func TestHelpListsArguments(t *testing.T) {
 		"-request-timeout",
 		"-idle-timeout",
 		"-reasoning-effort",
+		"-version",
 		"-system",
 		"-s",
 		"-prompt",
