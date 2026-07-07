@@ -86,7 +86,7 @@ func executeRequestWithContext(ctx context.Context, cfg config) (string, error) 
 		}
 
 		request.Header.Set("Content-Type", "application/json")
-		if strings.TrimSpace(cfg.APIKey) != "" {
+		if cfg.APIKey != "" {
 			request.Header.Set("Authorization", "Bearer "+cfg.APIKey)
 		}
 
@@ -158,7 +158,7 @@ func executeStreamingRequestWithContext(ctx context.Context, cfg config, output 
 		}
 
 		request.Header.Set("Content-Type", "application/json")
-		if strings.TrimSpace(cfg.APIKey) != "" {
+		if cfg.APIKey != "" {
 			request.Header.Set("Authorization", "Bearer "+cfg.APIKey)
 		}
 

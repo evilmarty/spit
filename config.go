@@ -25,6 +25,7 @@ func resolveConfig(
 	}
 
 	apiKey := resolveString(apiKeyArg, "OPENAI_API_KEY", "")
+	apiKey = resolveAPIKey(apiKey)
 
 	model := resolveString(modelArg, "OPENAI_MODEL", "")
 	if model == "" {
@@ -193,6 +194,10 @@ func resolveMaxRetries(argValue int) (int, error) {
 	}
 
 	return parsed, nil
+}
+
+func resolveAPIKey(apiKey string) string {
+	return strings.TrimSpace(apiKey)
 }
 
 func buildRequestURL(baseURL string) (string, error) {
