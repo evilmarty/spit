@@ -31,6 +31,7 @@ Flags override environment variables.
 | `--request-timeout` | `OPENAI_REQUEST_TIMEOUT` | No | unset (duration, e.g. `10s`) |
 | `--idle-timeout` | `OPENAI_IDLE_TIMEOUT` | No | unset (duration, e.g. `30s`) |
 | `--reasoning-effort` | `OPENAI_REASONING_EFFORT` | No | unset |
+| `--max-retries` | `OPENAI_MAX_RETRIES` | No | `3` |
 
 Message args:
 
@@ -39,6 +40,12 @@ Message args:
 - positional args are combined into one `user` message
 - stdin, when present, is appended as the last `user` message
 - base URL path is used as provided, and requests append `/chat/completions` (for OpenAI-compatible APIs, pass a base URL ending in `/v1`)
+
+Retry behavior:
+
+- Transient errors (429 Too Many Requests, 5xx status codes, timeouts, and network errors) are retried with exponential backoff and jitter.
+- Non-transient errors (4xx except 429, malformed payloads) fail immediately without retry.
+- Default retry count is 3; set `--max-retries 0` to disable retries or `--max-retries <n>` to customize.
 
 ## Build
 

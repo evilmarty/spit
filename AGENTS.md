@@ -11,6 +11,7 @@ Core behavior:
 - Accepts ordered message inputs from `--system`/`-s`, `--prompt`/`-p`, positional args, and optional stdin
 - Sends one chat-completions request with `stream: true`
 - Supports optional generation/lifecycle controls (`--format`, `--temperature`, `--top-p`, `--max-tokens`, `--request-timeout`, `--idle-timeout`, `--reasoning-effort`)
+- Retries transient errors (429, 5xx, timeouts) with exponential backoff and jitter (default 3 retries, configurable via `--max-retries`)
 - Appends a trailing newline after stream completion (without duplicating an existing newline)
 - Treats `SIGINT`/`SIGTERM` as graceful interruption: preserve partial output, ensure trailing newline, and exit with code `130`
 

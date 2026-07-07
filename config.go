@@ -17,6 +17,7 @@ func resolveConfig(
 	maxTokensArg int,
 	requestTimeoutArg, idleTimeoutArg,
 	reasoningEffortArg string,
+	maxRetriesArg int,
 ) (config, error) {
 	baseURL := resolveString(baseURLArg, "OPENAI_BASE_URL", "")
 	if baseURL == "" {
@@ -55,6 +56,11 @@ func resolveConfig(
 	}
 	reasoningEffort := resolveString(reasoningEffortArg, "OPENAI_REASONING_EFFORT", "")
 
+	maxRetries, err := resolveMaxRetries(maxRetriesArg)
+	if err != nil {
+		return config{}, err
+	}
+
 	return config{
 		BaseURL:         baseURL,
 		Model:           model,
@@ -66,6 +72,7 @@ func resolveConfig(
 		RequestTimeout:  requestTimeout,
 		IdleTimeout:     idleTimeout,
 		ReasoningEffort: reasoningEffort,
+		MaxRetries:      maxRetries,
 	}, nil
 }
 
@@ -168,6 +175,24 @@ func envKeyOrFlag(envKey string) string {
 		return "flag"
 	}
 	return envKey
+}
+
+func resolveMaxRetries(argValue int) (int, error) {
+	if argValue >= 0 {
+		return argValue, nil
+	}
+
+	envValue := strings.TrimSpace(os.Getenv("OPENAI_MAX_RETRIES"))
+	if envValue == "" {
+		return 3, nil
+	}
+
+	parsed, err := strconv.Atoi(envValue)
+	if err != nil || parsed < 0 {
+		return 0, fmt.Errorf("invalid OPENAI_MAX_RETRIES value %q", envValue)
+	}
+
+	return parsed, nil
 }
 
 func buildRequestURL(baseURL string) (string, error) {

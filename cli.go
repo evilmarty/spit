@@ -26,6 +26,7 @@ func runWithContext(ctx context.Context, args []string) error {
 		requestTimeoutArg  string
 		idleTimeoutArg     string
 		reasoningEffortArg string
+		maxRetriesArg      int
 	)
 
 	collector := &messageCollector{}
@@ -44,6 +45,7 @@ func runWithContext(ctx context.Context, args []string) error {
 	flags.StringVar(&requestTimeoutArg, "request-timeout", "", "request timeout duration (env: OPENAI_REQUEST_TIMEOUT)")
 	flags.StringVar(&idleTimeoutArg, "idle-timeout", "", "idle stream timeout duration (env: OPENAI_IDLE_TIMEOUT)")
 	flags.StringVar(&reasoningEffortArg, "reasoning-effort", "", "reasoning effort value (env: OPENAI_REASONING_EFFORT)")
+	flags.IntVar(&maxRetriesArg, "max-retries", -1, "max retries for transient errors (env: OPENAI_MAX_RETRIES, default: 3)")
 	flags.Func("system", "append a system prompt; repeat to add more", func(value string) error {
 		return collector.add("system", value)
 	})
@@ -69,6 +71,7 @@ func runWithContext(ctx context.Context, args []string) error {
 		fmt.Fprintln(os.Stderr, "  --request-timeout <duration>      Request timeout (env: OPENAI_REQUEST_TIMEOUT)")
 		fmt.Fprintln(os.Stderr, "  --idle-timeout <duration>         Idle stream timeout (env: OPENAI_IDLE_TIMEOUT)")
 		fmt.Fprintln(os.Stderr, "  --reasoning-effort <value>        Reasoning effort (env: OPENAI_REASONING_EFFORT)")
+		fmt.Fprintln(os.Stderr, "  --max-retries <int>               Max retries for transient errors (env: OPENAI_MAX_RETRIES, default: 3)")
 		fmt.Fprintln(os.Stderr)
 		fmt.Fprintln(os.Stderr, "Message options (preserve CLI order in payload):")
 		fmt.Fprintln(os.Stderr, "  --system, -s <text>               Add a system message (repeatable)")
@@ -112,6 +115,7 @@ func runWithContext(ctx context.Context, args []string) error {
 		formatArg, temperatureArg, topPArg, maxTokensArg,
 		requestTimeoutArg, idleTimeoutArg,
 		reasoningEffortArg,
+		maxRetriesArg,
 	)
 	if err != nil {
 		return err

@@ -45,6 +45,7 @@ type config struct {
 	RequestTimeout  *time.Duration
 	IdleTimeout     *time.Duration
 	ReasoningEffort string
+	MaxRetries      int
 	Messages        []chatMessage
 }
 

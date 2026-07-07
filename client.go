@@ -7,12 +7,31 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"strings"
 	"time"
 )
 
 var errInterrupted = errors.New("interrupted by signal")
+
+func isTransientError(err error, statusCode int) bool {
+	if err != nil {
+		var timeoutErr interface{ Timeout() bool }
+		if errors.As(err, &timeoutErr) && timeoutErr.Timeout() {
+			return true
+		}
+		return errors.Is(err, context.DeadlineExceeded)
+	}
+	return statusCode == http.StatusTooManyRequests || statusCode >= http.StatusInternalServerError
+}
+
+func backoffWithJitter(attempt int) time.Duration {
+	base := time.Duration(100) * time.Millisecond
+	exponential := base * time.Duration(1<<uint(attempt))
+	jitter := time.Duration(rand.Intn(100)) * time.Millisecond
+	return exponential + jitter
+}
 
 func executeRequest(cfg config) (string, error) {
 	return executeRequestWithContext(context.Background(), cfg)
@@ -40,40 +59,53 @@ func executeRequestWithContext(ctx context.Context, cfg config) (string, error) 
 		return "", fmt.Errorf("unable to encode request payload: %w", err)
 	}
 
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, requestURL, bytes.NewReader(body))
-	if err != nil {
-		return "", fmt.Errorf("unable to construct request: %w", err)
-	}
-
-	request.Header.Set("Content-Type", "application/json")
-	if strings.TrimSpace(cfg.APIKey) != "" {
-		request.Header.Set("Authorization", "Bearer "+cfg.APIKey)
-	}
-
 	timeout := 60 * time.Second
 	if cfg.RequestTimeout != nil {
 		timeout = *cfg.RequestTimeout
 	}
 	client := &http.Client{Timeout: timeout}
-	response, err := client.Do(request)
-	if err != nil {
-		if errors.Is(err, context.Canceled) && isInterruptedContext(ctx) {
-			return "", errInterrupted
+
+	for attempt := 0; attempt <= cfg.MaxRetries; attempt++ {
+		request, err := http.NewRequestWithContext(ctx, http.MethodPost, requestURL, bytes.NewReader(body))
+		if err != nil {
+			return "", fmt.Errorf("unable to construct request: %w", err)
 		}
-		return "", fmt.Errorf("request failed: %w", err)
-	}
-	defer response.Body.Close()
 
-	responseBody, err := io.ReadAll(response.Body)
-	if err != nil {
-		return "", fmt.Errorf("unable to read API response: %w", err)
+		request.Header.Set("Content-Type", "application/json")
+		if strings.TrimSpace(cfg.APIKey) != "" {
+			request.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+		}
+
+		response, err := client.Do(request)
+		if err != nil {
+			if errors.Is(err, context.Canceled) && isInterruptedContext(ctx) {
+				return "", errInterrupted
+			}
+			if isTransientError(err, 0) && attempt < cfg.MaxRetries {
+				time.Sleep(backoffWithJitter(attempt))
+				continue
+			}
+			return "", fmt.Errorf("request failed: %w", err)
+		}
+		defer response.Body.Close()
+
+		responseBody, err := io.ReadAll(response.Body)
+		if err != nil {
+			return "", fmt.Errorf("unable to read API response: %w", err)
+		}
+
+		if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+			if isTransientError(nil, response.StatusCode) && attempt < cfg.MaxRetries {
+				time.Sleep(backoffWithJitter(attempt))
+				continue
+			}
+			return "", formatAPIError(response.Status, responseBody)
+		}
+
+		return decodeAssistantContent(responseBody)
 	}
 
-	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return "", formatAPIError(response.Status, responseBody)
-	}
-
-	return decodeAssistantContent(responseBody)
+	return "", fmt.Errorf("request failed after %d retries", cfg.MaxRetries)
 }
 
 func executeStreamingRequest(cfg config, output io.Writer) error {
@@ -103,66 +135,79 @@ func executeStreamingRequestWithContext(ctx context.Context, cfg config, output 
 		return fmt.Errorf("unable to encode request payload: %w", err)
 	}
 
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, requestURL, bytes.NewReader(body))
-	if err != nil {
-		return fmt.Errorf("unable to construct request: %w", err)
-	}
-
-	request.Header.Set("Content-Type", "application/json")
-	if strings.TrimSpace(cfg.APIKey) != "" {
-		request.Header.Set("Authorization", "Bearer "+cfg.APIKey)
-	}
-
 	client := newStreamingHTTPClient(cfg.RequestTimeout)
-	response, err := client.Do(request)
-	if err != nil {
-		if errors.Is(err, context.Canceled) && isInterruptedContext(ctx) {
-			return errInterrupted
-		}
-		return fmt.Errorf("request failed: %w", err)
-	}
-	defer response.Body.Close()
 
-	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		responseBody, readErr := io.ReadAll(response.Body)
-		if readErr != nil {
-			return fmt.Errorf("unable to read API response: %w", readErr)
+	for attempt := 0; attempt <= cfg.MaxRetries; attempt++ {
+		request, err := http.NewRequestWithContext(ctx, http.MethodPost, requestURL, bytes.NewReader(body))
+		if err != nil {
+			return fmt.Errorf("unable to construct request: %w", err)
 		}
-		return formatAPIError(response.Status, responseBody)
-	}
 
-	if !strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream") {
-		responseBody, err := io.ReadAll(response.Body)
+		request.Header.Set("Content-Type", "application/json")
+		if strings.TrimSpace(cfg.APIKey) != "" {
+			request.Header.Set("Authorization", "Bearer "+cfg.APIKey)
+		}
+
+		response, err := client.Do(request)
 		if err != nil {
 			if errors.Is(err, context.Canceled) && isInterruptedContext(ctx) {
+				return errInterrupted
+			}
+			if isTransientError(err, 0) && attempt < cfg.MaxRetries {
+				time.Sleep(backoffWithJitter(attempt))
+				continue
+			}
+			return fmt.Errorf("request failed: %w", err)
+		}
+		defer response.Body.Close()
+
+		if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+			responseBody, readErr := io.ReadAll(response.Body)
+			if readErr != nil {
+				return fmt.Errorf("unable to read API response: %w", readErr)
+			}
+			if isTransientError(nil, response.StatusCode) && attempt < cfg.MaxRetries {
+				time.Sleep(backoffWithJitter(attempt))
+				continue
+			}
+			return formatAPIError(response.Status, responseBody)
+		}
+
+		if !strings.Contains(strings.ToLower(response.Header.Get("Content-Type")), "text/event-stream") {
+			responseBody, err := io.ReadAll(response.Body)
+			if err != nil {
+				if errors.Is(err, context.Canceled) && isInterruptedContext(ctx) {
+					_ = trackedOutput.ensureTrailingNewline()
+					return errInterrupted
+				}
+				return fmt.Errorf("unable to read API response: %w", err)
+			}
+
+			content, err := decodeAssistantContent(responseBody)
+			if err != nil {
+				return err
+			}
+			if _, err := io.WriteString(trackedOutput, content); err != nil {
+				return fmt.Errorf("unable to write output: %w", err)
+			}
+			return trackedOutput.ensureTrailingNewline()
+		}
+
+		idleTimeout := time.Duration(0)
+		if cfg.IdleTimeout != nil {
+			idleTimeout = *cfg.IdleTimeout
+		}
+		if err := writeStreamingContentWithIdleTimeout(response.Body, trackedOutput, idleTimeout); err != nil {
+			if isInterruptedContext(ctx) {
 				_ = trackedOutput.ensureTrailingNewline()
 				return errInterrupted
 			}
-			return fmt.Errorf("unable to read API response: %w", err)
-		}
-
-		content, err := decodeAssistantContent(responseBody)
-		if err != nil {
 			return err
-		}
-		if _, err := io.WriteString(trackedOutput, content); err != nil {
-			return fmt.Errorf("unable to write output: %w", err)
 		}
 		return trackedOutput.ensureTrailingNewline()
 	}
 
-	idleTimeout := time.Duration(0)
-	if cfg.IdleTimeout != nil {
-		idleTimeout = *cfg.IdleTimeout
-	}
-	if err := writeStreamingContentWithIdleTimeout(response.Body, trackedOutput, idleTimeout); err != nil {
-		if isInterruptedContext(ctx) {
-			_ = trackedOutput.ensureTrailingNewline()
-			return errInterrupted
-		}
-		return err
-	}
-	return trackedOutput.ensureTrailingNewline()
+	return fmt.Errorf("request failed after %d retries", cfg.MaxRetries)
 }
 
 func isInterruptedContext(ctx context.Context) bool {
