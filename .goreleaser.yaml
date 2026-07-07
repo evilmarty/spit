@@ -1,6 +1,8 @@
 version: 2
 project_name: spit
-
+before:
+  hooks:
+    - go mod tidy
 builds:
   - main: .
     binary: spit
@@ -8,43 +10,64 @@ builds:
       - CGO_ENABLED=0
     goos:
       - linux
-      - darwin
       - windows
+      - darwin
     goarch:
       - amd64
+      - arm
       - arm64
+    goarm:
+      - "5"
+      - "6"
+      - "7"
     ldflags:
-      - -s -w
-
+      - "-s -w"
 archives:
-  - name_template: "{{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}"
+  - name_template: "{{ .ProjectName }}-{{ .Version }}-{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}"
     formats:
-      - tar.gz
-    format_overrides:
-      - goos: windows
-        formats:
-          - zip
-
+      - binary
+brews:
+  - directory: Formula
+    homepage: "https://github.com/evilmarty/spit"
+    description: "spit is a Go CLI that sends prompts to OpenAI-compatible chat-completions APIs and streams output."
+    license: "MIT"
+    custom_block: |
+      head do
+        url "https://github.com/evilmarty/spit.git", branch: "main"
+        depends_on "go" => :build
+      end
+    install: |
+      if head?
+        system "go", "build", *std_go_args
+      else
+        bin.install Dir["#{name}-*"].first => name
+      end
+    test: |
+      help_output = shell_output("#{bin}/spit --help")
+      assert_match "Usage:", help_output
+    repository:
+      owner: evilmarty
+      name: homebrew-spit
+      branch: main
+release:
+  name_template: "{{ .Tag }}"
+  target_commitish: "{{ .Commit }}"
+  github:
+    owner: evilmarty
+    name: spit
 checksum:
   name_template: "{{ .ProjectName }}-{{ .Version }}-checksums.txt"
   algorithm: sha256
-
-release:
-  github:
-    owner: evilmarty
-    name: dotfiles
-  name_template: "{{ .Tag }}"
-  target_commitish: "{{ .Commit }}"
-
 snapshot:
-  version_template: "{{ incpatch .Version }}-next"
-
+  version_template: "{{ incpatch .Version }}-devel"
 changelog:
   use: git
   sort: asc
   filters:
     exclude:
+      - "README"
       - "^docs:"
       - "^test:"
-
+# modelines, feel free to remove those if you don't want/use them:
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# vim: set ts=2 sw=2 tw=0 fo=cnqoj
