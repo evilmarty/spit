@@ -18,6 +18,42 @@
 - Supports `--version` output with build date, version, and commit metadata
 - On interrupt (`Ctrl+C`/`SIGTERM`), cancels in-flight work, keeps partial output, appends newline, and exits with code `130`
 
+## Installation
+
+### Using Homebrew
+
+```bash
+brew install evilmarty/spit/spit
+```
+
+### Using Go
+
+Install the latest version directly using `go install`:
+
+```bash
+go install github.com/evilmarty/spit@latest
+```
+
+Ensure your `go/bin` directory (typically `$HOME/go/bin` or `$GOPATH/bin`) is in your system's `$PATH`.
+
+### Pre-built Binaries
+
+You can download the latest release from [GitHub Releases](https://github.com/evilmarty/spit/releases/latest).
+
+### Building from Source
+
+Make sure you have [Go](https://golang.org/) installed.
+
+Clone the repository and build the executable:
+
+```bash
+git clone https://github.com/evilmarty/spit
+cd spit
+go build -ldflags="-X main.Version=v1.0.0" -o spit
+```
+
+You can then move the `spit` binary to a location in your `$PATH`.
+
 ## Configuration
 
 Flags override environment variables.
