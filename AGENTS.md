@@ -7,7 +7,7 @@
 Core behavior:
 
 - Accepts base URL configuration (`--base-url`/`-u`)
-- Requires a model via `--model`/`-m` or `OPENAI_MODEL`
+- Uses default base URL `http://localhost:11434/v1` and default model `llama3` when unset
 - Accepts ordered message inputs from `--system`/`-s`, `--prompt`/`-p`, positional args, and optional stdin
 - Sends one chat-completions request with `stream: true`
 - Supports optional generation/lifecycle controls (`--format`, `--temperature`, `--top-p`, `--max-tokens`, `--request-timeout`, `--idle-timeout`, `--reasoning-effort`)

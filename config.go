@@ -19,18 +19,12 @@ func resolveConfig(
 	reasoningEffortArg string,
 	maxRetriesArg int,
 ) (config, error) {
-	baseURL := resolveString(baseURLArg, "OPENAI_BASE_URL", "")
-	if baseURL == "" {
-		return config{}, errors.New("missing base URL; set --base-url or OPENAI_BASE_URL")
-	}
+	baseURL := resolveString(baseURLArg, "OPENAI_BASE_URL", "http://localhost:11434/v1")
 
 	apiKey := resolveString(apiKeyArg, "OPENAI_API_KEY", "")
 	apiKey = resolveAPIKey(apiKey)
 
-	model := resolveString(modelArg, "OPENAI_MODEL", "")
-	if model == "" {
-		return config{}, errors.New("missing model; set --model or OPENAI_MODEL")
-	}
+	model := resolveString(modelArg, "OPENAI_MODEL", "llama3")
 	format, err := resolveFormat(formatArg)
 	if err != nil {
 		return config{}, err

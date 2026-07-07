@@ -8,7 +8,7 @@
 
 ## Features
 
-- Base URL from CLI flags or environment variables
+- Base URL from CLI flags/environment variables, defaulting to `http://localhost:11434/v1`
 - Any number of `system` and `user` prompts via args, preserved in payload order
 - Optional stdin input appended as the final `user` message
 - Streams assistant output as it is received
@@ -21,9 +21,9 @@ Flags override environment variables.
 
 | Flag | Env var | Required | Default |
 | --- | --- | --- | --- |
-| `--base-url` / `-u` | `OPENAI_BASE_URL` | Yes | none |
+| `--base-url` / `-u` | `OPENAI_BASE_URL` | No | `http://localhost:11434/v1` |
 | `--api-key` | `OPENAI_API_KEY` | No | unset |
-| `--model` / `-m` | `OPENAI_MODEL` | Yes | none |
+| `--model` / `-m` | `OPENAI_MODEL` | No | `llama3` |
 | `--format` / `-f` | n/a | No | `text` (`text` or `json`) |
 | `--temperature` | `OPENAI_TEMPERATURE` | No | unset (0 to 2) |
 | `--top-p` | `OPENAI_TOP_P` | No | unset (0 to 1) |

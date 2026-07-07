@@ -113,30 +113,49 @@ func TestRunUnknownFlagReturnsParseError(t *testing.T) {
 	}
 }
 
-func TestRunRequiresModelWhenEnvUnset(t *testing.T) {
+func TestRunUsesDefaultModelWhenEnvUnset(t *testing.T) {
+	var captured chatCompletionRequest
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Fatalf("failed to read body: %v", err)
+		}
+		if err := json.Unmarshal(body, &captured); err != nil {
+			t.Fatalf("failed to unmarshal payload: %v", err)
+		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: [DONE]\n\n"))
+	}))
+	defer server.Close()
+
 	withEnv(t, map[string]string{"OPENAI_MODEL": ""}, func() {
 		err := run([]string{
-			"--base-url", "http://example.com",
+			"--base-url", server.URL,
 			"--prompt", "hello",
 		})
-		if err == nil || !strings.Contains(err.Error(), "missing model") {
-			t.Fatalf("expected missing model error, got %v", err)
+		if err != nil {
+			t.Fatalf("expected run success with default model, got %v", err)
 		}
 	})
+
+	if captured.Model != "llama3" {
+		t.Fatalf("expected default model llama3, got %q", captured.Model)
+	}
 }
 
-func TestRunRequiresBaseURLWhenEnvUnset(t *testing.T) {
-	withEnv(t, map[string]string{
-		"OPENAI_BASE_URL": "",
-		"OPENAI_MODEL":    "model",
-	}, func() {
-		err := run([]string{
-			"--prompt", "hello",
-		})
-		if err == nil || !strings.Contains(err.Error(), "missing base URL") {
-			t.Fatalf("expected missing base URL error, got %v", err)
-		}
+func TestRunHelpIncludesDefaultBaseURLAndModel(t *testing.T) {
+	stderr, err := captureStderr(t, func() error {
+		return run([]string{"--help"})
 	})
+	if err == nil || !strings.Contains(err.Error(), "help requested") {
+		t.Fatalf("expected help requested error, got %v", err)
+	}
+	if !strings.Contains(stderr, "http://localhost:11434/v1") {
+		t.Fatalf("expected help to include default base URL, got:\n%s", stderr)
+	}
+	if !strings.Contains(stderr, "default: llama3") {
+		t.Fatalf("expected help to include default model, got:\n%s", stderr)
+	}
 }
 
 func TestRunWithContextInterruptKeepsPartialOutputAndNewline(t *testing.T) {

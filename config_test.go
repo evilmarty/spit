@@ -87,19 +87,28 @@ func TestResolveConfigDefaults(t *testing.T) {
 		"OPENAI_BASE_URL": "",
 		"OPENAI_MODEL":    "",
 	}, func() {
-		_, err := resolveConfig("http://example.com", "", "", "", "", "", -1, "", "", "", 0)
-		if err == nil || !strings.Contains(err.Error(), "missing model") {
-			t.Fatalf("expected missing model error, got %v", err)
+		cfg, err := resolveConfig("", "", "", "", "", "", -1, "", "", "", 0)
+		if err != nil {
+			t.Fatalf("resolveConfig returned error: %v", err)
+		}
+		if cfg.BaseURL != "http://localhost:11434/v1" {
+			t.Fatalf("expected default base URL, got %q", cfg.BaseURL)
+		}
+		if cfg.Model != "llama3" {
+			t.Fatalf("expected default model llama3, got %q", cfg.Model)
 		}
 	})
 
 	withEnv(t, map[string]string{
-		"OPENAI_BASE_URL": "",
+		"OPENAI_BASE_URL": "http://from-env.example/v1",
 		"OPENAI_MODEL":    "from-env",
 	}, func() {
-		cfg, err := resolveConfig("http://example.com", "", "", "", "", "", -1, "", "", "", 0)
+		cfg, err := resolveConfig("", "", "", "", "", "", -1, "", "", "", 0)
 		if err != nil {
 			t.Fatalf("resolveConfig returned error: %v", err)
+		}
+		if cfg.BaseURL != "http://from-env.example/v1" {
+			t.Fatalf("expected base URL from OPENAI_BASE_URL, got %q", cfg.BaseURL)
 		}
 		if cfg.Model != "from-env" {
 			t.Fatalf("expected model from OPENAI_MODEL, got %q", cfg.Model)
@@ -117,16 +126,6 @@ func TestResolveConfigDefaults(t *testing.T) {
 }
 
 func TestResolveConfigErrors(t *testing.T) {
-	withEnv(t, map[string]string{
-		"OPENAI_BASE_URL": "",
-		"OPENAI_API_KEY":  "",
-	}, func() {
-		_, err := resolveConfig("", "", "", "", "", "", -1, "", "", "", 0)
-		if err == nil || !strings.Contains(err.Error(), "missing base URL") {
-			t.Fatalf("expected missing base URL error, got %v", err)
-		}
-	})
-
 	withEnv(t, map[string]string{
 		"OPENAI_BASE_URL": "http://example.com",
 		"OPENAI_API_KEY":  "key",
