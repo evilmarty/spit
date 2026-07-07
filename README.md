@@ -6,6 +6,8 @@
 
 `spit` is a small Go CLI that sends chat-completion requests to an OpenAI-compatible base URL and prints the assistant output.
 
+![spit demo](assets/demo.gif)
+
 ## Features
 
 - Base URL from CLI flags/environment variables, defaulting to `http://localhost:11434/v1`
