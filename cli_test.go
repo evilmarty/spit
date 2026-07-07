@@ -234,7 +234,7 @@ func TestHelpListsArguments(t *testing.T) {
 		"-f",
 		"-temperature",
 		"-top-p",
-		"-max_tokens",
+		"-max-tokens",
 		"-request-timeout",
 		"-idle-timeout",
 		"-reasoning-effort",

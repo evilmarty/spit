@@ -11,26 +11,23 @@ import (
 )
 
 func resolveConfig(
-	baseURLArg, baseURLShortArg,
+	baseURLArg,
 	modelArg, apiKeyArg,
 	formatArg, temperatureArg, topPArg string,
 	maxTokensArg int,
 	requestTimeoutArg, idleTimeoutArg,
 	reasoningEffortArg string,
 ) (config, error) {
-	baseURL := resolveString(baseURLArg, "", "")
+	baseURL := resolveString(baseURLArg, "OPENAI_BASE_URL", "")
 	if baseURL == "" {
-		baseURL = resolveString(baseURLShortArg, "OPENAI_BASE_URL", "")
-	}
-	if baseURL == "" {
-		return config{}, errors.New("missing base URL; set --base-url/-u or OPENAI_BASE_URL")
+		return config{}, errors.New("missing base URL; set --base-url or OPENAI_BASE_URL")
 	}
 
 	apiKey := resolveString(apiKeyArg, "OPENAI_API_KEY", "")
 
 	model := resolveString(modelArg, "OPENAI_MODEL", "")
 	if model == "" {
-		return config{}, errors.New("missing model; set --model/-m or OPENAI_MODEL")
+		return config{}, errors.New("missing model; set --model or OPENAI_MODEL")
 	}
 	format, err := resolveFormat(formatArg)
 	if err != nil {

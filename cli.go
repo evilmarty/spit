@@ -17,7 +17,6 @@ func run(args []string) error {
 func runWithContext(ctx context.Context, args []string) error {
 	var (
 		baseURLArg         string
-		baseURLShortArg    string
 		modelArg           string
 		apiKeyArg          string
 		formatArg          string
@@ -33,7 +32,7 @@ func runWithContext(ctx context.Context, args []string) error {
 	flags := flag.NewFlagSet("spit", flag.ContinueOnError)
 	flags.SetOutput(os.Stderr)
 	flags.StringVar(&baseURLArg, "base-url", "", "base URL (env: OPENAI_BASE_URL)")
-	flags.StringVar(&baseURLShortArg, "u", "", "base URL (shorthand)")
+	flags.StringVar(&baseURLArg, "u", "", "base URL (shorthand)")
 	flags.StringVar(&modelArg, "model", "", "model name (env: OPENAI_MODEL)")
 	flags.StringVar(&modelArg, "m", "", "model name (shorthand)")
 	flags.StringVar(&apiKeyArg, "api-key", "", "API key (env: OPENAI_API_KEY)")
@@ -41,7 +40,7 @@ func runWithContext(ctx context.Context, args []string) error {
 	flags.StringVar(&formatArg, "f", "text", "response format (shorthand)")
 	flags.StringVar(&temperatureArg, "temperature", "", "sampling temperature (env: OPENAI_TEMPERATURE)")
 	flags.StringVar(&topPArg, "top-p", "", "nucleus sampling top_p (env: OPENAI_TOP_P)")
-	flags.IntVar(&maxTokensArg, "max_tokens", -1, "max tokens to generate (env: OPENAI_MAX_TOKENS)")
+	flags.IntVar(&maxTokensArg, "max-tokens", -1, "max tokens to generate (env: OPENAI_MAX_TOKENS)")
 	flags.StringVar(&requestTimeoutArg, "request-timeout", "", "request timeout duration (env: OPENAI_REQUEST_TIMEOUT)")
 	flags.StringVar(&idleTimeoutArg, "idle-timeout", "", "idle stream timeout duration (env: OPENAI_IDLE_TIMEOUT)")
 	flags.StringVar(&reasoningEffortArg, "reasoning-effort", "", "reasoning effort value (env: OPENAI_REASONING_EFFORT)")
@@ -66,7 +65,7 @@ func runWithContext(ctx context.Context, args []string) error {
 		fmt.Fprintln(os.Stderr, "  --format, -f <text|json>          Response format mode (default: text)")
 		fmt.Fprintln(os.Stderr, "  --temperature <float>             Sampling temperature (env: OPENAI_TEMPERATURE)")
 		fmt.Fprintln(os.Stderr, "  --top-p <float>                   Nucleus sampling top_p (env: OPENAI_TOP_P)")
-		fmt.Fprintln(os.Stderr, "  --max_tokens <int>                Max tokens to generate (env: OPENAI_MAX_TOKENS)")
+		fmt.Fprintln(os.Stderr, "  --max-tokens <int>                Max tokens to generate (env: OPENAI_MAX_TOKENS)")
 		fmt.Fprintln(os.Stderr, "  --request-timeout <duration>      Request timeout (env: OPENAI_REQUEST_TIMEOUT)")
 		fmt.Fprintln(os.Stderr, "  --idle-timeout <duration>         Idle stream timeout (env: OPENAI_IDLE_TIMEOUT)")
 		fmt.Fprintln(os.Stderr, "  --reasoning-effort <value>        Reasoning effort (env: OPENAI_REASONING_EFFORT)")
@@ -108,7 +107,7 @@ func runWithContext(ctx context.Context, args []string) error {
 	}
 
 	cfg, err := resolveConfig(
-		baseURLArg, baseURLShortArg,
+		baseURLArg,
 		modelArg, apiKeyArg,
 		formatArg, temperatureArg, topPArg, maxTokensArg,
 		requestTimeoutArg, idleTimeoutArg,

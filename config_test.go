@@ -19,7 +19,7 @@ func TestResolveConfigPrecedenceAndOptions(t *testing.T) {
 		"OPENAI_REASONING_EFFORT": "medium",
 	}, func() {
 		cfg, err := resolveConfig(
-			"http://arg.example:9000", "http://short.example:7000",
+			"http://arg.example:9000",
 			"arg-model", "arg-key",
 			"json", "0.7", "0.8", 99,
 			"2s", "3s",
@@ -68,7 +68,7 @@ func TestResolveConfigUsesShortBaseURLBeforeEnv(t *testing.T) {
 		"OPENAI_MODEL":    "env-model",
 		"OPENAI_API_KEY":  "",
 	}, func() {
-		cfg, err := resolveConfig("", "http://short.example:7000", "", "", "", "", "", -1, "", "", "")
+		cfg, err := resolveConfig("http://short.example:7000", "", "", "", "", "", -1, "", "", "")
 		if err != nil {
 			t.Fatalf("resolveConfig returned error: %v", err)
 		}
@@ -86,7 +86,7 @@ func TestResolveConfigDefaults(t *testing.T) {
 		"OPENAI_BASE_URL": "",
 		"OPENAI_MODEL":    "",
 	}, func() {
-		_, err := resolveConfig("http://example.com", "", "", "", "", "", "", -1, "", "", "")
+		_, err := resolveConfig("http://example.com", "", "", "", "", "", -1, "", "", "")
 		if err == nil || !strings.Contains(err.Error(), "missing model") {
 			t.Fatalf("expected missing model error, got %v", err)
 		}
@@ -96,7 +96,7 @@ func TestResolveConfigDefaults(t *testing.T) {
 		"OPENAI_BASE_URL": "",
 		"OPENAI_MODEL":    "from-env",
 	}, func() {
-		cfg, err := resolveConfig("http://example.com", "", "", "", "", "", "", -1, "", "", "")
+		cfg, err := resolveConfig("http://example.com", "", "", "", "", "", -1, "", "", "")
 		if err != nil {
 			t.Fatalf("resolveConfig returned error: %v", err)
 		}
@@ -120,7 +120,7 @@ func TestResolveConfigErrors(t *testing.T) {
 		"OPENAI_BASE_URL": "",
 		"OPENAI_API_KEY":  "",
 	}, func() {
-		_, err := resolveConfig("", "", "", "", "", "", "", -1, "", "", "")
+		_, err := resolveConfig("", "", "", "", "", "", -1, "", "", "")
 		if err == nil || !strings.Contains(err.Error(), "missing base URL") {
 			t.Fatalf("expected missing base URL error, got %v", err)
 		}
@@ -131,7 +131,7 @@ func TestResolveConfigErrors(t *testing.T) {
 		"OPENAI_API_KEY":  "key",
 		"OPENAI_MODEL":    "model",
 	}, func() {
-		_, err := resolveConfig("", "", "", "", "", "x", "", -1, "", "", "")
+		_, err := resolveConfig("", "", "", "", "x", "", -1, "", "", "")
 		if err == nil || !strings.Contains(err.Error(), "OPENAI_TEMPERATURE") {
 			t.Fatalf("expected OPENAI_TEMPERATURE parse error, got %v", err)
 		}
@@ -141,7 +141,7 @@ func TestResolveConfigErrors(t *testing.T) {
 		"OPENAI_BASE_URL": "http://example.com",
 		"OPENAI_MODEL":    "model",
 	}, func() {
-		_, err := resolveConfig("", "", "", "", "", "2.1", "", -1, "", "", "")
+		_, err := resolveConfig("", "", "", "", "2.1", "", -1, "", "", "")
 		if err == nil || !strings.Contains(err.Error(), "OPENAI_TEMPERATURE") || !strings.Contains(err.Error(), "between 0 and 2") {
 			t.Fatalf("expected OPENAI_TEMPERATURE range error, got %v", err)
 		}
@@ -151,7 +151,7 @@ func TestResolveConfigErrors(t *testing.T) {
 		"OPENAI_BASE_URL": "http://example.com",
 		"OPENAI_MODEL":    "model",
 	}, func() {
-		_, err := resolveConfig("", "", "", "", "xml", "", "", -1, "", "", "")
+		_, err := resolveConfig("", "", "", "xml", "", "", -1, "", "", "")
 		if err == nil || !strings.Contains(err.Error(), "supported values are text or json") {
 			t.Fatalf("expected format validation error, got %v", err)
 		}
@@ -162,7 +162,7 @@ func TestResolveConfigErrors(t *testing.T) {
 		"OPENAI_MODEL":    "model",
 		"OPENAI_TOP_P":    "1.1",
 	}, func() {
-		_, err := resolveConfig("", "", "", "", "", "", "", -1, "", "", "")
+		_, err := resolveConfig("", "", "", "", "", "", -1, "", "", "")
 		if err == nil || !strings.Contains(err.Error(), "OPENAI_TOP_P") || !strings.Contains(err.Error(), "between 0 and 1") {
 			t.Fatalf("expected OPENAI_TOP_P range error, got %v", err)
 		}
@@ -177,7 +177,7 @@ func TestResolveConfigErrors(t *testing.T) {
 		"OPENAI_TOP_P":            "",
 		"OPENAI_REASONING_EFFORT": "",
 	}, func() {
-		_, err := resolveConfig("", "", "", "", "", "", "", -1, "", "", "")
+		_, err := resolveConfig("", "", "", "", "", "", -1, "", "", "")
 		if err == nil || !strings.Contains(err.Error(), "OPENAI_REQUEST_TIMEOUT") {
 			t.Fatalf("expected OPENAI_REQUEST_TIMEOUT parse error, got %v", err)
 		}

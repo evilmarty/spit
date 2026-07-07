@@ -27,7 +27,7 @@ Flags override environment variables.
 | `--format` / `-f` | n/a | No | `text` (`text` or `json`) |
 | `--temperature` | `OPENAI_TEMPERATURE` | No | unset (0 to 2) |
 | `--top-p` | `OPENAI_TOP_P` | No | unset (0 to 1) |
-| `--max_tokens` | `OPENAI_MAX_TOKENS` | No | unset |
+| `--max-tokens` | `OPENAI_MAX_TOKENS` | No | unset |
 | `--request-timeout` | `OPENAI_REQUEST_TIMEOUT` | No | unset (duration, e.g. `10s`) |
 | `--idle-timeout` | `OPENAI_IDLE_TIMEOUT` | No | unset (duration, e.g. `30s`) |
 | `--reasoning-effort` | `OPENAI_REASONING_EFFORT` | No | unset |
@@ -80,7 +80,7 @@ Run the built binary with explicit flags:
   -f json \
   --temperature 0.7 \
   --top-p 0.9 \
-  --max_tokens 512 \
+  --max-tokens 512 \
   --request-timeout 10s \
   --idle-timeout 30s \
   --reasoning-effort medium \
