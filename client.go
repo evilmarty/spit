@@ -15,6 +15,20 @@ import (
 
 var errInterrupted = errors.New("interrupted by signal")
 
+// Global HTTP clients for connection pooling and reuse.
+var (
+	defaultHTTPClient    *http.Client
+	streamingHTTPClient  *http.Client
+)
+
+func init() {
+	// Default client for non-streaming requests with standard timeout.
+	defaultHTTPClient = &http.Client{Timeout: 60 * time.Second}
+
+	// Streaming client without global timeout (uses ResponseHeaderTimeout instead).
+	streamingHTTPClient = &http.Client{}
+}
+
 func isTransientError(err error, statusCode int) bool {
 	if err != nil {
 		var timeoutErr interface{ Timeout() bool }
@@ -59,11 +73,11 @@ func executeRequestWithContext(ctx context.Context, cfg config) (string, error) 
 		return "", fmt.Errorf("unable to encode request payload: %w", err)
 	}
 
-	timeout := 60 * time.Second
+	// Use a request-specific client if a custom timeout is configured.
+	client := defaultHTTPClient
 	if cfg.RequestTimeout != nil {
-		timeout = *cfg.RequestTimeout
+		client = &http.Client{Timeout: *cfg.RequestTimeout}
 	}
-	client := &http.Client{Timeout: timeout}
 
 	for attempt := 0; attempt <= cfg.MaxRetries; attempt++ {
 		request, err := http.NewRequestWithContext(ctx, http.MethodPost, requestURL, bytes.NewReader(body))
@@ -216,12 +230,12 @@ func isInterruptedContext(ctx context.Context) bool {
 
 func newStreamingHTTPClient(requestTimeout *time.Duration) *http.Client {
 	if requestTimeout == nil {
-		return &http.Client{}
+		return streamingHTTPClient
 	}
 
 	baseTransport, ok := http.DefaultTransport.(*http.Transport)
 	if !ok {
-		return &http.Client{}
+		return streamingHTTPClient
 	}
 	transport := baseTransport.Clone()
 	transport.ResponseHeaderTimeout = *requestTimeout
