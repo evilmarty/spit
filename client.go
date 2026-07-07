@@ -79,8 +79,16 @@ func executeRequestWithContext(ctx context.Context, cfg config) (string, error) 
 		client = &http.Client{Timeout: *cfg.RequestTimeout}
 	}
 
+	// Create request body reader once, reset for each attempt.
+	bodyReader := bytes.NewReader(body)
+
 	for attempt := 0; attempt <= cfg.MaxRetries; attempt++ {
-		request, err := http.NewRequestWithContext(ctx, http.MethodPost, requestURL, bytes.NewReader(body))
+		// Reset reader position for retry attempts.
+		if attempt > 0 {
+			bodyReader.Reset(body)
+		}
+
+		request, err := http.NewRequestWithContext(ctx, http.MethodPost, requestURL, bodyReader)
 		if err != nil {
 			return "", fmt.Errorf("unable to construct request: %w", err)
 		}
@@ -151,8 +159,16 @@ func executeStreamingRequestWithContext(ctx context.Context, cfg config, output 
 
 	client := newStreamingHTTPClient(cfg.RequestTimeout)
 
+	// Create request body reader once, reset for each attempt.
+	bodyReader := bytes.NewReader(body)
+
 	for attempt := 0; attempt <= cfg.MaxRetries; attempt++ {
-		request, err := http.NewRequestWithContext(ctx, http.MethodPost, requestURL, bytes.NewReader(body))
+		// Reset reader position for retry attempts.
+		if attempt > 0 {
+			bodyReader.Reset(body)
+		}
+
+		request, err := http.NewRequestWithContext(ctx, http.MethodPost, requestURL, bodyReader)
 		if err != nil {
 			return fmt.Errorf("unable to construct request: %w", err)
 		}
